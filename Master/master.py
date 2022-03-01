@@ -1,7 +1,7 @@
 import socket
 import ssl
 
-hostname = 'www.python.org'
+hostname = 'solarbroom.com'
 context = ssl.create_default_context()
 
 with socket.create_connection((hostname, 443)) as sock:
