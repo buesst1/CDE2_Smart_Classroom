@@ -8,7 +8,7 @@ PORT = 443
 file_path = str(pathlib.Path(__file__).parent.resolve())
 
 context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-context.load_cert_chain(keyfile= file_path + "/SSL/PEM.pem", keyfile=file_path + "/SSL/PEM.pem")
+context.load_cert_chain(certfile= file_path + "/SSL/PEM.pem", keyfile=file_path + "/SSL/PEM.pem")
 
 while True:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0) as sock:
