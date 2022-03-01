@@ -1,25 +1,22 @@
+from ast import While
 import socket
 import ssl
 import pathlib
-
 
 HOST = "127.0.0.1"
 PORT = 443
 file_path = str(pathlib.Path(__file__).parent.resolve())
 
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+context.load_cert_chain(keyfile= file_path + "/SSL/PEM.pem", keyfile=file_path + "/SSL/PEM.pem")
 
-server = ssl.wrap_socket(server, server_side=True, keyfile=file_path + "/SSL/PEM.pem", certfile=file_path + "/SSL/PEM.pem")
+while True:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0) as sock:
+        sock.bind((HOST, PORT))
+        sock.listen(5)
 
-if __name__ == "__main__":
-    server.bind((HOST, PORT))
-    server.listen(0)
+        with context.wrap_socket(sock, server_side=True) as ssock:
+            conn, addr = ssock.accept()
+        
 
-    while True:
-        connection, client_address = server.accept()
-        while True:
-            data = connection.recv(1024)
-            if not data:
-                break
-            print(f"Received: {data.decode('utf-8')}")
+
