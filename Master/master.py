@@ -1,9 +1,14 @@
 import socket
 import ssl
+from time import sleep
 
-hostname = '192.168.0.101'
+from numpy import byte
+
+hostname = 'localhost'
 context = ssl.create_default_context()
 
 with socket.create_connection((hostname, 443)) as sock:
     with context.wrap_socket(sock, server_hostname=hostname) as ssock:
-        print(ssock.version())
+        ssock.write(str.encode("test", encoding="utf-8"))
+
+        ssock.read()
