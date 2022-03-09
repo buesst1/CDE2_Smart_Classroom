@@ -4,7 +4,7 @@ from time import sleep
 
 from numpy import byte
 
-HOST = 'solarbroom.com'
+HOST = 'solarBroom.com'
 PORT = 443
 
 context = ssl.create_default_context()

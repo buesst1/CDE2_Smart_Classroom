@@ -3,7 +3,7 @@ import ssl
 import os
 
 
-HOST = "localhost"
+HOST = "0.0.0.0"
 PORT = 443
 dirname = os.path.dirname(__file__)
 
@@ -12,7 +12,7 @@ context.load_cert_chain(dirname + r'\SSL\certificate.crt', dirname + r'\SSL\cert
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0) as sock:
     sock.bind((HOST, PORT))
-    sock.listen(5)
+    sock.listen()
     with context.wrap_socket(sock, server_side=True) as ssock:
         conn, addr = ssock.accept()
 
