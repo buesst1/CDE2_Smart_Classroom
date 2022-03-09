@@ -4,7 +4,7 @@ import os
 
 
 HOST = "localhost"
-PORT = 8443
+PORT = 443
 dirname = os.path.dirname(__file__)
 
 context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
