@@ -1,0 +1,2 @@
+adafruit-blinka-bleio 
+adafruit-circuitpython-ble
