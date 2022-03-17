@@ -1,3 +1,4 @@
+from time import sleep
 from adafruit_ble import BLERadio
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 from adafruit_ble.services.nordic import UARTService
@@ -6,17 +7,19 @@ import adafruit_dht
 import adafruit_scd30
 import board
 import busio 
-import time
+import supervisor
+import json
 
 
 class blueTooth:
-    def __init__(self, deviceName: str, end_char = "*"):
+    def __init__(self, deviceName: str, start_read_timeout_s=10):
         self.__ble = BLERadio()
         self.__ble.name = deviceName
+
         self.__uart = UARTService()
+        self.__uart.timeout = start_read_timeout_s
+
         self.__advertisement = ProvideServicesAdvertisement(self.__uart)
-        
-        self.__end_char = end_char
 
     def Advertise_Until_Connected_Sync(self):
         """
@@ -40,7 +43,10 @@ class blueTooth:
         while not self.__ble.connected:
             continue
 
-    def Read_Message_Sync(self, max_num_of_received_chars = 10) -> str:
+    def Is_Connected(self):
+        return self.__ble.connected
+
+    def Read_Message_Sync(self) -> str:
         """
         This method reads incoming data
 
@@ -49,31 +55,35 @@ class blueTooth:
         end_char (char) -> end character
         max_num_of_received_chars (int) -> max number of characters to be reiceved to avoid an overflow of ram
         """
-        
-        message = "" #received stored here
 
-        startTime = time.monotonic() #store time for timeout
+        if not self.__ble.connected:
+            raise Exception("not connected to a device")
 
-        while True:
+        #wait until bytes arrived
+        while self.__uart.in_waiting < 1:
             if not self.__ble.connected:
-                raise ConnectionAbortedError()
+                raise Exception("connection lost")
 
-            one_byte = self.__uart.read(1).decode("utf-8")  #read a byte -> returns b'' if nothing was read.
+        bytes_ = self.__uart.readline()  #read a byte -> returns b'' if nothing was read.
 
-            #if a byte received
-            if one_byte:
-                if one_byte != self.__end_char : #if data (no endchar) received
-                    message +=  one_byte
+        if bytes_ == None:
+            raise Exception("Connection failed")
 
-                    #if received message is too long
-                    if len(message) > max_num_of_received_chars:
-                        raise OverflowError()
+        message = str(bytes_.decode("utf-8"))
+        message = message.rstrip("\n")
+        message = message.rstrip("\r")
 
-                else: #endchar received
-                    return message
+        return message 
+            
+    def Write_Message_Sync(self, message: str):
+        buffer = str.encode(message + "\n", "utf-8")
+        self.__uart.write(buffer)
 
     def Send_Message_Sync(self, message: str, end_char = '*'):
         pass
+
+    def Clear_Buffer(self):
+        self.__uart.reset_input_buffer()
 
 class SCD30_Sensor:
     def __init__(self, i2c_address = 0x61):
@@ -164,23 +174,147 @@ class Light_Sensor:
 
         return R_Sensor
 
+class Sensors(object):
+    SCD30_Sensor = "CO2_Sensor"
+    DHT_Sensor = "DHT_Sensor"
 
+class Error(object):
+    PhysicalConnectionerror = "physical_connection_error" #cannot communiacte with device
+    ReadFailure = "read_failed" #cannot read measurement
 
+class Manager:
+    def __init__(self, sensors: list, deviceName: str, time_until_advertize_s = 15):
+        """
+        parameter:
+        sensors (list of Sensors to activate)
+        """
 
+        self.__sensors = sensors
+        self.__deviceName = deviceName
+        self.__ble = blueTooth(deviceName)
+        self.__time_until_advertize_s = time_until_advertize_s
 
-ble = blueTooth("BLE Device 1")
+        #init sensor classes
 
-scd30 = SCD30_Sensor()
+        self.__scd_30_sensor = None
+        self.__dht_sensor = None
 
-dht = DHT_Temperature_Sensor(board.D5)
+        self.__Init_Sensors()
 
-light_sensor = Light_Sensor(board.A2)
+    def __Init_Sensors(self):
+        if Sensors.SCD30_Sensor in self.__sensors:
+            try:
+                self.__scd_30_sensor = SCD30_Sensor()
+            except:
+
+                self.__scd_30_sensor = Error.PhysicalConnectionerror
+
+        if Sensors.DHT_Sensor in self.__sensors:
+            try:
+                self.__dht_sensor = DHT_Temperature_Sensor()
+            except:
+                self.__dht_sensor = Error.PhysicalConnectionerror
+
+    def Wait_For_Connection_sync(self):
+        """
+        This function waits for a bluetooth connection and starts advertizing after a specific period of time
+        """
+        
+        now = supervisor.ticks_ms()
+
+        connected = False
+        while(((supervisor.ticks_ms() - now) / 1000) <= self.__time_until_advertize_s):
+            #has a bluetooth connection
+            if self.__ble.Is_Connected():
+                connected = True
+                break
+
+            sleep(1) #wait a second
+
+        #if not connected -> start advertizing
+        if not connected:
+            self.__ble.Advertise_Until_Connected_Sync()
+        
+    def Read_Message_From_BLE(self):
+        return self.__ble.Read_Message_Sync()
+
+    def Write_Message_To_BLE(self, message: str):
+        self.__ble.Write_Message_Sync(message)
+
+    def Read_Measures(self) -> dict:
+        measure_dict = {}
+        measure_dict["deviceName"] = self.__deviceName
+
+        sensors = {}
+
+        #if sensor active
+        if self.__scd_30_sensor != None:
+            scd_30_sensor = {}
+
+            if self.__scd_30_sensor != Error.PhysicalConnectionerror: 
+                measurements = {}
+
+                try:
+                    measurements["SCD_30_CO2"] = self.__scd_30_sensor.Read_CO2_PPM()
+                except:
+                    measurements["SCD_30_CO2"] = Error.ReadFailure
+
+                try:
+                    measurements["SCD_30_HUM"] = self.__scd_30_sensor.Read_Rel_Hum_Percent()
+                except:
+                    measurements["SCD_30_HUM"] = Error.ReadFailure
+
+                try:
+                    measurements["SCD_30_TEMP"] = self.__scd_30_sensor.Read_Temp_Celcius()
+                except:
+                    measurements["SCD_30_TEMP"] = Error.ReadFailure
+
+                scd_30_sensor["measurements"] = measurements
+
+            else:
+                scd_30_sensor["measurements"] = Error.PhysicalConnectionerror
+
+            sensors["scd_30_sensor"] = scd_30_sensor
+            
+
+        measure_dict["sensors"] = sensors
+
+        return measure_dict
+
+    def Clear_InBuffer(self):
+        self.__ble.Clear_Buffer()
+
+manager = Manager([Sensors.SCD30_Sensor], "MainSensor")
 
 while True:
-    try:
-        print(light_sensor._Read_Resistance_Ohms())
-    except Exception as ex:
-        print("An exception occured: ", ex)
+    manager.Clear_InBuffer()
+    
+    manager.Wait_For_Connection_sync() #wait for a ble connection
+    
+    print("Connected")
 
-    time.sleep(2)
+    #try handle command
+    try:
+        pass
+
+    except Exception as ex:
+        print(f"Exception in handle command: {ex}")
+
+    message = manager.Read_Message_From_BLE()
+
+    print("\r" in message)
+
+    if message == "measure_request":
+
+        stringified_json = json.dumps(manager.Read_Measures())
+
+        print(stringified_json)
+
+        manager.Write_Message_To_BLE(stringified_json)
+
+    else:
+        raise Exception("Unknown command received")
+
+    sleep(5) #sleep 5 sec 
+
     
