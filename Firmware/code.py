@@ -7,12 +7,11 @@ import adafruit_dht
 import adafruit_scd30
 import board
 import busio 
-import supervisor
 import json
 
 
 class blueTooth:
-    def __init__(self, deviceName: str, start_read_timeout_s=10):
+    def __init__(self, deviceName: str, start_read_timeout_s=5):
         self.__ble = BLERadio()
         self.__ble.name = deviceName
 
@@ -76,15 +75,13 @@ class blueTooth:
         return message 
             
     def Write_Message_Sync(self, message: str):
-        buffer = str.encode(message + "\n", "utf-8")
-        self.__uart.write(buffer)
+        msg = message + "\n"
+        for msg_snippets in msg:
+            buffer = str.encode(msg_snippets, "utf-8")
 
-    def Send_Message_Sync(self, message: str, end_char = '*'):
-        pass
-
-    def Clear_Buffer(self):
-        self.__uart.reset_input_buffer()
-
+            self.__uart.write(buffer)
+            sleep(0.0001)
+            
 class SCD30_Sensor:
     def __init__(self, i2c_address = 0x61):
         self.__i2c = busio.I2C(board.SCL, board.SDA, frequency=1000)  # for FT232H, use 1KHz
@@ -211,29 +208,16 @@ class Manager:
 
         if Sensors.DHT_Sensor in self.__sensors:
             try:
-                self.__dht_sensor = DHT_Temperature_Sensor()
+                self.__dht_sensor = DHT_Temperature_Sensor(board.D5) #on development shield it is the pin D2
             except:
                 self.__dht_sensor = Error.PhysicalConnectionerror
 
     def Wait_For_Connection_sync(self):
         """
-        This function waits for a bluetooth connection and starts advertizing after a specific period of time
+        This function waits for a bluetooth connection 
         """
         
-        now = supervisor.ticks_ms()
-
-        connected = False
-        while(((supervisor.ticks_ms() - now) / 1000) <= self.__time_until_advertize_s):
-            #has a bluetooth connection
-            if self.__ble.Is_Connected():
-                connected = True
-                break
-
-            sleep(1) #wait a second
-
-        #if not connected -> start advertizing
-        if not connected:
-            self.__ble.Advertise_Until_Connected_Sync()
+        self.__ble.Advertise_Until_Connected_Sync()
         
     def Read_Message_From_BLE(self):
         return self.__ble.Read_Message_Sync()
@@ -275,45 +259,68 @@ class Manager:
                 scd_30_sensor["measurements"] = Error.PhysicalConnectionerror
 
             sensors["scd_30_sensor"] = scd_30_sensor
-            
+
+        if self.__dht_sensor != None:
+            dht_sensor = {}
+
+            if self.__dht_sensor != Error.PhysicalConnectionerror: 
+                measurements = {}
+
+                try:
+                    result = self.__dht_sensor.Read_Temp_Celcius()
+
+                    if result is None:
+                        raise Exception("DHT_Temperature failed to read")
+
+                    measurements["DHT_TEMP"] = result
+                except:
+                    measurements["DHT_TEMP"] = Error.ReadFailure
+
+                try:
+                    result = self.__dht_sensor.Read_Humidity_Percent()
+
+                    if result is None:
+                        raise Exception("DHT_Humidity failed to read")
+
+                    measurements["DHT_HUM"] = result
+                except:
+                    measurements["DHT_HUM"] = Error.ReadFailure
+
+                dht_sensor["measurements"] = measurements
+
+            else:
+                dht_sensor["measurements"] = Error.PhysicalConnectionerror
+
+            sensors["dht_sensor"] = dht_sensor
 
         measure_dict["sensors"] = sensors
 
         return measure_dict
 
-    def Clear_InBuffer(self):
-        self.__ble.Clear_Buffer()
-
-manager = Manager([Sensors.SCD30_Sensor], "MainSensor")
+manager = Manager([Sensors.SCD30_Sensor, Sensors.DHT_Sensor], "MainSensor")
 
 while True:
-    manager.Clear_InBuffer()
-    
     manager.Wait_For_Connection_sync() #wait for a ble connection
     
     print("Connected")
 
     #try handle command
     try:
-        pass
+        message = manager.Read_Message_From_BLE()
+
+        if message == "measure_request":
+
+            stringified_json = json.dumps(manager.Read_Measures())
+
+            print(stringified_json)
+
+            manager.Write_Message_To_BLE(stringified_json)
+
+        else:
+            raise Exception("Unknown command received")
 
     except Exception as ex:
-        print(f"Exception in handle command: {ex}")
-
-    message = manager.Read_Message_From_BLE()
-
-    print("\r" in message)
-
-    if message == "measure_request":
-
-        stringified_json = json.dumps(manager.Read_Measures())
-
-        print(stringified_json)
-
-        manager.Write_Message_To_BLE(stringified_json)
-
-    else:
-        raise Exception("Unknown command received")
+        print(f"Exception in handle command: {ex}") 
 
     sleep(5) #sleep 5 sec 
 

@@ -1,6 +1,8 @@
+from ast import While
 from datetime import datetime
 import socket
 import ssl
+from time import sleep
 from typing import Tuple
 import _bleio
 import adafruit_ble
@@ -30,8 +32,6 @@ class BLE:
         """
 
         self.__device_names = device_names
-
-        self.__device_advertisements = {} #device advertisements are stored here as dictionoary (key: device name, value: advertisement)
         
         # CircuitPython <6 uses its own ConnectionError type. So, is it if available. Otherwise,
         # the built in ConnectionError is used.
@@ -69,7 +69,7 @@ class BLE:
 
         return measurement_device_advertizements
 
-    def __Connect_ToAllAvailableDevices(self) -> list:
+    def __Connect_ToAllAvailableDevices(self, device_advertisements: dict) -> list:
         """
         This method tries to connect to all advertizements
 
@@ -79,8 +79,8 @@ class BLE:
         
         failed_devices = [] #device names that was unable to connect to are stored here
 
-        for advertizement_key in list(self.__device_advertisements.keys()):
-            advertizement = self.__device_advertisements[advertizement_key]
+        for advertizement_key in list(device_advertisements.keys()):
+            advertizement = device_advertisements[advertizement_key]
         
             try:
                 if UARTService not in advertizement.services:
@@ -93,7 +93,7 @@ class BLE:
 
         return failed_devices
 
-    def __Request_Measurements_from_all_connections(self, start_read_timeout_s=4, read_buffer_size = 10000) -> Tuple:
+    def __Request_Measurements_from_all_connections(self, start_read_timeout_s=4) -> Tuple:
         """
         This method requests all measurements from all devices
 
@@ -111,29 +111,33 @@ class BLE:
                         raise Exception("UART not available for this device")
 
                     uart = connection[UARTService]
-                    uart.buffer_size = read_buffer_size
-
-                    uart.reset_input_buffer()
-
-                    uart.write(str.encode("measure_request\n", encoding="utf-8"))
                     uart.timeout = start_read_timeout_s
 
-                    #wait until bytes arrived
-                    while uart.in_waiting < 1:
-                        if not connection.connected:
-                            raise Exception("connection lost")
+                    uart.write(str.encode("measure_request\n", encoding="utf-8"))
 
-                    bytes_ = uart.readline()  #read a byte -> returns b'' if nothing was read.
+                    message = ""
+                    while True:
+                        #wait until bytes arrived
+                        while uart.in_waiting < 1:
+                            if not connection.connected:
+                                raise Exception("connection lost")
 
-                    if bytes_ == None:
-                        raise Exception("Connection failed")
+                        byte_ = uart.read(1)
 
-                    message = str(bytes_.decode("utf-8"))
-                    message = message.rstrip("\n")
-                    message = message.rstrip("\r")
+                        if byte_ == None:
+                            raise Exception("Connection failed")
 
-                    print(message)
-                    json_responses.append(json.loads(message)) 
+                        received_char = str(byte_.decode("utf-8"))
+
+                        if received_char:
+                            if received_char != "\n":
+                                message += received_char
+
+                            else:
+                                json_responses.append(json.loads(message)) 
+
+                                break
+                    
 
                 except Exception as ex:
                     print(f"Exception occured in Request_Measurements_from_all_connections: {ex}")
@@ -149,23 +153,19 @@ class BLE:
                 
     def Start_Request(self):
         #if we dont have all advertizements of all registered devices -> search for devices
-        if set(self.__device_names) != set(self.__device_advertisements.keys()): 
-            adverts = self.__Scan_For_Advertizements()
-
-            for ad in list(adverts.keys()):
-                if ad not in self.__device_advertisements.keys(): #if we found a device that we don't have an advertizement from
-                    self.__device_advertisements[ad] = adverts[ad] #append new advertizement 
-
+        adverts = self.__Scan_For_Advertizements()
         
-        connection_unavailable_deviceNames = self.__Connect_ToAllAvailableDevices()
+        connection_unavailable_deviceNames = self.__Connect_ToAllAvailableDevices(adverts)
 
         for device_name in connection_unavailable_deviceNames:
             self.__device_advertisements.pop(device_name, None) #remove device from available dict
 
         timeStamp, jsons = self.__Request_Measurements_from_all_connections()
 
-        print(jsons)
-
+        return (timeStamp, jsons)
 
 ble = BLE(["MainSensor"])
-ble.Start_Request()
+while True:
+    print(ble.Start_Request())
+
+    sleep(10)
