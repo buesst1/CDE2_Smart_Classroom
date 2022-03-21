@@ -3,6 +3,7 @@ from adafruit_ble import BLERadio
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 from adafruit_ble.services.nordic import UARTService
 from analogio import AnalogIn
+from sympy import E
 import adafruit_dht
 import adafruit_scd30
 import board
@@ -46,7 +47,7 @@ class blueTooth:
     def Is_Connected(self):
         return self.__ble.connected
 
-    def Read_Message_Sync(self) -> str:
+    def Read_Message_Sync(self, timeout_s = 4) -> str:
         """
         This method reads incoming data
 
@@ -59,10 +60,15 @@ class blueTooth:
         if not self.__ble.connected:
             raise Exception("not connected to a device")
 
+        monotonic_time_s = monotonic()
+
         #wait until bytes arrived
         while self.__uart.in_waiting < 1:
             if not self.__ble.connected:
                 raise Exception("connection lost")
+
+            elif (monotonic() - monotonic_time_s) > timeout_s:
+                raise Exception("Timeout occured")
 
         bytes_ = self.__uart.readline()  #read a byte -> returns b'' if nothing was read.
 
@@ -301,29 +307,29 @@ class Manager:
 manager = Manager([Sensors.SCD30_Sensor, Sensors.DHT_Sensor], "MainSensor")
 
 while True:
-    manager.Wait_For_Connection_sync() #wait for a ble connection
-    
-    print("Connected")
-
-    #try handle command
     try:
+        #wait for a ble connection
+        manager.Wait_For_Connection_sync() 
+    
+        print("Connected")
+
         message = manager.Read_Message_From_BLE()
 
         if message == "measure_request":
 
             stringified_json = json.dumps(manager.Read_Measures())
 
-            print(stringified_json)
-
             manager.Write_Message_To_BLE(stringified_json)
 
         else:
             raise Exception("Unknown command received")
+        
+        #go in light sleep
+        time_alarm = alarm.time.TimeAlarm(monotonic_time=monotonic() + 10)
+        alarm.light_sleep_until_alarms(time_alarm)
 
     except Exception as ex:
-        print(f"Exception in handle command: {ex}") 
+        print(f"Exception occuren in main loop: {ex}") 
 
-    time_alarm = alarm.time.TimeAlarm(monotonic_time=monotonic() + 10)
-    alarm.light_sleep_until_alarms(time_alarm)
-
+    
     

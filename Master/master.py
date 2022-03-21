@@ -1,28 +1,127 @@
-from ast import While
 from datetime import datetime
+from math import fabs
 import socket
 import ssl
-from time import sleep
-from typing import Tuple
+from time import monotonic, sleep, time
 import _bleio
-import adafruit_ble
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 from adafruit_ble.services.nordic import UARTService
+from adafruit_ble import BLEConnection
 import json
+import os
 
 class SSL:
-    def __init__(self) -> None:
-        self.HOST = 'solarBroom.com'
-        self.PORT = 443
+    def __init__(self, host= 'solarBroom.com', port= 443) -> None:
+        self.HOST = host
+        self.PORT = port
 
-    def __Send_Read(self, message:str):
+    def __Send_Read(self, message:str) -> str:
         context = ssl.create_default_context()
         with socket.create_connection((self.HOST, self.PORT)) as sock:
             with context.wrap_socket(sock, server_hostname=self.HOST) as ssock:
     
                 ssock.write(str.encode(message, encoding="utf-8"))
 
-                return ssock.read()
+                return ssock.read().decode(encoding="utf-8")
+
+    def __Write(self, message: str) -> bool:
+        try:
+            received = self.__Send_Read()
+
+            if received != "confirmed":
+                raise Exception("unknown confirmation message received")
+
+            return True
+
+        except Exception as ex:
+            print(f"Unable to send message to server: {ex}")
+            return false
+
+    def Send_Jsons(self, jsons:list) -> bool:
+
+        stringified_jsons = []
+        for json_ in jsons:
+            stringified_jsons.append(json.dumps(json_))
+
+        jsons_appended = "ʮ".join(stringified_jsons)
+
+        return self.__Write("data~"+jsons_appended)
+            
+class Cache:
+    def __init__(self, relative_fileName = "cache") -> None:
+        self.__script_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
+        self.__full_fileName = str(self.__script_dir) + "/" + relative_fileName #full path to cache script
+
+        self.__cache_cleanup()#delete invalid data
+
+    def __cache_cleanup(self):
+        try:
+            #read content of caches
+            with open(self.__full_fileName, "r") as fd:
+                content:str = fd.read()
+
+            #check if strings are valid jsons
+            json_files = []
+            for json_string in content.split("\n"):
+                if len(json_string) > 0:
+                    try:
+                        json_files.append(json.loads(json_string))
+                    except:
+                        print("Measurement lost during cache cleanup...")
+
+            #clear cache
+            with open(self.__full_fileName, 'w'):
+                pass
+
+            #append jsons to cache
+            with open(self.__full_fileName, 'a') as fd:
+                for json_file in json_files:
+                    fd.write(json.dumps(json_file) + "\n")
+
+        except Exception as ex:
+            print(f"Cache cleanup encountered an error: {ex}")
+
+    def Cache_Append_Json(self, json_file:json) -> bool:
+        try:
+            #append jsons to cache
+            with open(self.__full_fileName, 'a') as fd:
+                fd.write(json.dumps(json_file) + "\n")
+
+            return True
+
+        except Exception as ex:
+            print(f"Cache append encountered an error: {ex}")
+            return False
+
+    def Cache_Read(self) -> list or None:
+        try:
+            #read content of caches
+            with open(self.__full_fileName, "r") as fd:
+                content:str = fd.read()
+
+            #check if strings are valid jsons and store them
+            json_files = []
+            for json_string in content.split("\n"):
+                if len(json_string) > 0:
+                    try:
+                        json_files.append(json.loads(json_string))
+                    except:
+                        print("Measurement lost during cache reading...")
+
+            return json_files   
+
+        except Exception as ex:
+            print(f"Cache read encountered an error: {ex}")
+            return None
+
+    def Cache_Clear(self) -> bool:
+        try:
+            #clear cache
+            with open(self.__full_fileName, 'w'):
+                pass
+
+        except Exception as ex:
+            print(f"Cache clear encountered an error: {ex}")
 
 class BLE:
     def __init__(self, device_names: list) -> None:
@@ -69,31 +168,32 @@ class BLE:
 
         return measurement_device_advertizements
 
-    def __Connect_ToAllAvailableDevices(self, device_advertisements: dict) -> list:
+    def __TryConnect_ToDevice(self, device_advertisements: ProvideServicesAdvertisement) -> list:
         """
         This method tries to connect to all advertizements
 
         returns:
         keys from advertizements that was unable to connect to
         """
+
+        try:
+            if UARTService not in device_advertisements.services:
+                raise Exception("UART not available for this device")
+
+            return self.__ble.connect(device_advertisements)
+
+        except Exception as ex:
+            print(f"Was unable to connect to device:\n{ex}")
+            return None
         
-        failed_devices = [] #device names that was unable to connect to are stored here
+    def __Disconnect_FromDevice_Save(self, connection: BLEConnection):
+        try:
+            connection.disconnect()
 
-        for advertizement_key in list(device_advertisements.keys()):
-            advertizement = device_advertisements[advertizement_key]
-        
-            try:
-                if UARTService not in advertizement.services:
-                    raise Exception("UART not available for this device")
+        except:
+            pass
 
-                self.__ble.connect(advertizement)
-
-            except Exception as ex:
-                print(f"Was unable to connect to {advertizement_key}:\n{ex}")
-
-        return failed_devices
-
-    def __Request_Measurements_from_all_connections(self, start_read_timeout_s=4) -> Tuple:
+    def __Request_Measurements_from_connection(self, connection: BLEConnection, start_read_timeout_s=4) -> list:
         """
         This method requests all measurements from all devices
 
@@ -101,71 +201,105 @@ class BLE:
         tuple(time of request start as datetime, all received json responses as list)
         """
         
-        json_responses = []
-        start_time = datetime.now()
+        json_response: json = None
 
-        while self.__ble.connected and any(UARTService in connection for connection in self.__ble.connections):
-            for connection in self.__ble.connections:
-                try:
-                    if UARTService not in connection:
-                        raise Exception("UART not available for this device")
+        try:
+            if UARTService not in connection:
+                raise Exception("UART not available for this device")
 
-                    uart = connection[UARTService]
-                    uart.timeout = start_read_timeout_s
+            uart:UARTService = connection[UARTService]
+            uart.timeout = start_read_timeout_s
 
-                    uart.write(str.encode("measure_request\n", encoding="utf-8"))
+            uart.write(str.encode("measure_request\n", encoding="utf-8"))
 
-                    message = ""
-                    while True:
-                        #wait until bytes arrived
-                        while uart.in_waiting < 1:
-                            if not connection.connected:
-                                raise Exception("connection lost")
+            message = ""
+            while True:
+                #wait until bytes arrived
+                while uart.in_waiting < 1:
+                    if not connection.connected:
+                        raise Exception("connection lost")
 
-                        byte_ = uart.read(1)
+                byte_:bytes = uart.read(1)
 
-                        if byte_ == None:
-                            raise Exception("Connection failed")
+                if byte_ == None:
+                    raise Exception("Connection timeout")
 
-                        received_char = str(byte_.decode("utf-8"))
+                received_char = str(byte_.decode("utf-8"))
 
-                        if received_char:
-                            if received_char != "\n":
-                                message += received_char
+                if received_char:
+                    if received_char != "\n":
+                        message += received_char
 
-                            else:
-                                json_responses.append(json.loads(message)) 
+                    else:
+                        json_response = json.loads(message)
+                        break
+            
+        except Exception as ex:
+            print(f"Exception occured in __Request_Measurements_from_connection: {ex}")
 
-                                break
-                    
-
-                except Exception as ex:
-                    print(f"Exception occured in Request_Measurements_from_all_connections: {ex}")
-
-                try:
-                    connection.disconnect()
-
-                except:
-                    pass
-                
-
-        return (start_time, json_responses)
+        return json_response
                 
     def Start_Request(self):
-        #if we dont have all advertizements of all registered devices -> search for devices
+        jsons:json = json.dumps({deviceName:"BLE_error" for deviceName in self.__device_names}) #create json 
+
         adverts = self.__Scan_For_Advertizements()
-        
-        connection_unavailable_deviceNames = self.__Connect_ToAllAvailableDevices(adverts)
 
-        for device_name in connection_unavailable_deviceNames:
-            self.__device_advertisements.pop(device_name, None) #remove device from available dict
+        timeStamp = datetime.now() #get current time
+        for deviceName in list(adverts.keys()):
+            ad = adverts[deviceName]
 
-        timeStamp, jsons = self.__Request_Measurements_from_all_connections()
+            connection = self.__TryConnect_ToDevice(ad)
+
+            if (connection != None):
+                answer = self.__Request_Measurements_from_connection(connection)
+
+                self.__Disconnect_FromDevice_Save() #disconnect if a connection was opened
+
+                #getting data was successful
+                if answer != None:
+                    jsons[deviceName] = answer
+
+            else:
+                print(f"Was unable to connect to {deviceName}")
+
+            
 
         return (timeStamp, jsons)
 
+server = SSL()
 ble = BLE(["MainSensor"])
+cache = Cache()
+
 while True:
-    print(ble.Start_Request())
+    #wait 10s
+    timestamp = monotonic()
+    while (monotonic() - timestamp) < 10:
+        sleep(1)
+
+
+    #start measurement
+    all_jsons = [] #all measurements are stored here
+
+    #start a ble request
+    start_Time, jsons = ble.Start_Request()
+    new_measurement = json.dumps({"timeStamp":start_Time, "data":jsons})  
+
+    #read cached jsons
+    cached_jsons = cache.Cache_Read() 
+
+    #append jsons
+    all_jsons.append(new_measurement) 
+
+    if cached_jsons != None:
+        all_jsons.extend(cached_jsons)
+    
+    #if jsons sent successfully
+    if server.Send_Jsons(all_jsons):
+        if not cache.Cache_Clear():#clear cache
+            raise Exception("cache could not be cleared")
+
+    else:
+        if not cache.Cache_Append_Json(new_measurement):
+            raise Exception("cache could not be extended")
 
     sleep(10)
