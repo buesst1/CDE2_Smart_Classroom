@@ -1,4 +1,4 @@
-from time import sleep
+from time import monotonic, sleep
 from adafruit_ble import BLERadio
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 from adafruit_ble.services.nordic import UARTService
@@ -8,6 +8,7 @@ import adafruit_scd30
 import board
 import busio 
 import json
+import alarm
 
 
 class blueTooth:
@@ -322,6 +323,7 @@ while True:
     except Exception as ex:
         print(f"Exception in handle command: {ex}") 
 
-    sleep(5) #sleep 5 sec 
+    time_alarm = alarm.time.TimeAlarm(monotonic_time=monotonic() + 10)
+    alarm.light_sleep_until_alarms(time_alarm)
 
     
