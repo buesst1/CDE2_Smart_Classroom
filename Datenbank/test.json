@@ -1,7 +1,20 @@
 {
-    "sensor_id":"2",
-    "sensor_name":"test ab web",
-    "sensor_type":"CO2","value1":"817",
-    "scale1":"0","unit1":"ppm",
-    "entry_document":"Yannic isch top"
+    "ENTRY_ID":"1",
+    "INSERT_TIME":"timestamp",
+    "CO2A1":"1000",
+    "CO2A2":"40%",
+    "CO2A3":"21",
+    "CO2B1":"1000",
+    "CO2B2":"40",
+    "CO2B3":"21",
+    "CO2C1":"1000",
+    "CO2C2":"40",
+    "CO2C3":"21",
+    "FENSTERA1":"0",
+    "FENSTERA2":"0",
+    "FENSTERA3":"0",
+    "FENSTERB1":"1",
+    "FENSTERB2":"1",
+    "LICHT1":"1500",
+    "LICHT2":"test python"
 }
