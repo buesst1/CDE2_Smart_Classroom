@@ -1,41 +1,70 @@
 from datetime import datetime
-from math import fabs
 import socket
 import ssl
-from time import monotonic, sleep, time
+from time import monotonic, sleep
 import _bleio
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 from adafruit_ble.services.nordic import UARTService
 from adafruit_ble import BLEConnection
+import adafruit_ble
 import json
 import os
 
 class SSL:
-    def __init__(self, host= 'solarBroom.com', port= 443) -> None:
+    def __init__(self, host= 'solarbroom.com', port= 443) -> None:
         self.HOST = host
         self.PORT = port
 
     def __Send_Read(self, message:str) -> str:
-        context = ssl.create_default_context()
-        with socket.create_connection((self.HOST, self.PORT)) as sock:
-            with context.wrap_socket(sock, server_hostname=self.HOST) as ssock:
-    
-                ssock.write(str.encode(message, encoding="utf-8"))
+        context = ssl._create_unverified_context()
 
-                return ssock.read().decode(encoding="utf-8")
+        bindsocket = socket.create_connection((self.HOST, self.PORT), timeout=5)
+        conn = context.wrap_socket(bindsocket, server_hostname=self.HOST)
+
+        print(bindsocket.timeout)
+
+        message_bytes = str.encode(message + "\n") #convert to bytes
+        
+        conn.sendall(message_bytes)
+
+        #read message
+        message = "" #message stored here
+
+        #wait until bytes arrived
+        data = None
+        while not data:
+            data = conn.recv(buflen=1)
+
+        while data:
+            if data != b"\n":
+                message += bytes.decode(data) 
+
+                data = conn.recv(1)
+            else:
+                break
+
+
+        conn.shutdown(socket.SHUT_RDWR)
+        conn.close()
+
+        return message
 
     def __Write(self, message: str) -> bool:
         try:
-            received = self.__Send_Read()
+            received = self.__Send_Read(message)
 
-            if received != "confirmed":
+            if received == "confirmed":
+                return True
+
+            elif received == "failed":
+                return False
+
+            else:
                 raise Exception("unknown confirmation message received")
-
-            return True
 
         except Exception as ex:
             print(f"Unable to send message to server: {ex}")
-            return false
+            return False
 
     def Send_Jsons(self, jsons:list) -> bool:
 
@@ -43,19 +72,23 @@ class SSL:
         for json_ in jsons:
             stringified_jsons.append(json.dumps(json_))
 
-        jsons_appended = "ʮ".join(stringified_jsons)
+        jsons_appended = ";".join(stringified_jsons)
 
         return self.__Write("data~"+jsons_appended)
             
 class Cache:
     def __init__(self, relative_fileName = "cache") -> None:
-        self.__script_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
+        self.__script_dir = os.path.dirname(os.path.realpath(__file__)) #<-- absolute dir the script is in
         self.__full_fileName = str(self.__script_dir) + "/" + relative_fileName #full path to cache script
 
-        self.__cache_cleanup()#delete invalid data
+        self.__cache_cleanup_or_creation()#delete invalid data or create file if not existing
 
-    def __cache_cleanup(self):
+    def __cache_cleanup_or_creation(self):
         try:
+            #create file if not exists
+            with open(self.__full_fileName,"a+") as fd:
+                pass
+
             #read content of caches
             with open(self.__full_fileName, "r") as fd:
                 content:str = fd.read()
@@ -117,11 +150,14 @@ class Cache:
     def Cache_Clear(self) -> bool:
         try:
             #clear cache
-            with open(self.__full_fileName, 'w'):
+            with open(self.__full_fileName, 'w') as fd:
                 pass
+
+            return True
 
         except Exception as ex:
             print(f"Cache clear encountered an error: {ex}")
+            return False
 
 class BLE:
     def __init__(self, device_names: list) -> None:
@@ -145,24 +181,33 @@ class BLE:
 
         measurement_device_advertizements = {} #advertizements of measurement devices are stored here
 
-        print("scanning")
-        found_addr = set()
-        for advertisement in self.__ble.start_scan(ProvideServicesAdvertisement, timeout=5):
-            addr = advertisement.address
+        try:
+            print("scanning")
+            found_addr = set()
+            for advertisement in self.__ble.start_scan(ProvideServicesAdvertisement, timeout=5):
+                addr = advertisement.address
 
-            if addr not in found_addr:
-                found_addr.add(addr)
+                if addr not in found_addr:
+                    found_addr.add(addr)
 
-                name_raw = advertisement.complete_name
+                    name_raw = advertisement.complete_name
 
-                if not name_raw:
-                    continue
+                    if not name_raw:
+                        continue
 
-                name = name_raw.strip("\x00")
+                    name = name_raw.strip("\x00")
 
-                if name in self.__device_names:
-                    measurement_device_advertizements[name] = advertisement
-                    print(f"Device with name: {name} and address: {addr} found")
+                    if name in self.__device_names:
+                        measurement_device_advertizements[name] = advertisement
+                        print(f"Device with name: {name} and address: {addr} found")
+
+        except Exception as ex:
+            print(f"Exception occured in __Scan_For_Advertizements: {ex}")
+
+        try:
+            self.__ble.stop_scan()
+        except:
+            pass
 
         print("scan done")
 
@@ -240,7 +285,7 @@ class BLE:
         return json_response
                 
     def Start_Request(self):
-        jsons:json = json.dumps({deviceName:"BLE_error" for deviceName in self.__device_names}) #create json 
+        jsons:json = json.loads(json.dumps({deviceName:"BLE_error" for deviceName in self.__device_names})) #create json 
 
         adverts = self.__Scan_For_Advertizements()
 
@@ -253,7 +298,7 @@ class BLE:
             if (connection != None):
                 answer = self.__Request_Measurements_from_connection(connection)
 
-                self.__Disconnect_FromDevice_Save() #disconnect if a connection was opened
+                self.__Disconnect_FromDevice_Save(connection) #disconnect if a connection was opened
 
                 #getting data was successful
                 if answer != None:
@@ -273,16 +318,15 @@ cache = Cache()
 while True:
     #wait 10s
     timestamp = monotonic()
-    while (monotonic() - timestamp) < 10:
+    while (monotonic() - timestamp) < 15:
         sleep(1)
-
 
     #start measurement
     all_jsons = [] #all measurements are stored here
 
     #start a ble request
     start_Time, jsons = ble.Start_Request()
-    new_measurement = json.dumps({"timeStamp":start_Time, "data":jsons})  
+    new_measurement = json.dumps({"timeStamp":start_Time.strftime("%m/%d/%Y %H:%M:%S"), "data":jsons})  
 
     #read cached jsons
     cached_jsons = cache.Cache_Read() 
@@ -299,7 +343,6 @@ while True:
             raise Exception("cache could not be cleared")
 
     else:
+        print("Data Cached")
         if not cache.Cache_Append_Json(new_measurement):
             raise Exception("cache could not be extended")
-
-    sleep(10)

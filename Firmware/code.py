@@ -3,7 +3,6 @@ from adafruit_ble import BLERadio
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 from adafruit_ble.services.nordic import UARTService
 from analogio import AnalogIn
-from sympy import E
 import adafruit_dht
 import adafruit_scd30
 import board

@@ -1,11 +1,9 @@
 import json
-from threading import Thread
+import threading
 import socket
 import ssl
 import os
-from pyrsistent import T
-
-from sympy import EX
+from time import sleep
 
 class SSL:
     def __init__(self, host="0.0.0.0", port = 443) -> None:
@@ -13,29 +11,40 @@ class SSL:
         self.PORT = port
 
         self.__dirname = os.path.dirname(__file__)
-        self.__conext = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        self.__conext.load_cert_chain(self.__dirname + r'\SSL\certificate.crt', self.__dirname + r'\SSL\certificate.key')
 
         self.__input_jsons = []
 
         #start listener thread
-        self.__listener_thread = Thread(target=self.__listener)
-        self.__listener_thread.start()
+        self.__listener_thread = threading.Thread(target=self.__listener, daemon=True)
+        self.__listener_thread.start()  
 
     def __listener(self):
         try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0) as sock:
-                sock.bind((self.HOST, self.PORT))
-                sock.listen()
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.load_cert_chain(self.__dirname + r'\\SSL\\certificate.crt', self.__dirname + r'\\SSL\\certificate.key')
 
-                with self.__conext.wrap_socket(sock, server_side=True) as ssock:
-                    while True:
-                        try:
-                            conn, addr = ssock.accept()
-                            self.__handle_client(conn)
+            bindsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+            bindsocket.bind((self.HOST, self.PORT))
+            bindsocket.listen(5)
 
-                        except Exception as ex:
-                            print(f"Exception occured during accepting client: {ex}")
+            while True:
+                print("listening")
+                newsocket, fromaddr = bindsocket.accept()
+                print("accepted")
+
+                connstream = context.wrap_socket(newsocket, server_side=True)
+
+                try:
+                    self.__handle_client(connstream)
+
+                except Exception as ex:
+                    print(f"Exception occured during accepting client: {ex}")
+
+                finally:
+                    connstream.shutdown(socket.SHUT_RDWR)
+                    connstream.close()
+
+                    print("connection closed")
                         
 
         except Exception as ex:
@@ -43,37 +52,48 @@ class SSL:
 
     def __handle_client(self, conn:ssl.SSLSocket):
         try:
-            message = conn.read().decode(encoding="utf-8")
+            #read message
+            message = "" #message stored here
+
+            #wait until bytes arrived
+            data = None
+            while not data:
+                data = conn.recv(buflen=1)
+
+            while data:
+                if data != b"\n":
+                    message += bytes.decode(data) 
+
+                    data = conn.recv(1)
+                else:
+                    break
+
+            print("Message received!")
 
             splitted_msg = message.split("~")
 
             if len(splitted_msg) != 2:
-                conn.write(str.encode("failed", encoding="utf-8"))
+                conn.sendall(str.encode("failed\n"))
+
                 raise Exception("message has incorrect length")
 
             if splitted_msg[0] == "data":
                 if self.__handle__jsons(splitted_msg[1]):
-                    conn.write(str.encode("confirmed", encoding="utf-8"))
+                    conn.sendall(str.encode("confirmed\n"))
+
                 else:
-                    conn.write(str.encode("failed", encoding="utf-8"))
+                    conn.sendall(str.encode("failed\n"))
 
             else:
-                conn.write(str.encode("failed", encoding="utf-8"))
+                conn.sendall(str.encode("failed\n"))
                 raise Exception("unknown command received")
 
         except Exception as ex:
             print(f"Exception occured during handling client: {ex}")
 
-        finally:
-            #finally close connection 
-            try:
-                conn.close()
-            except:
-                pass
-
     def __handle__jsons(self, stringified_jsons:str) -> bool:
         try:
-            all_jsons = stringified_jsons.split("ʮ")
+            all_jsons = stringified_jsons.split(";")
 
             #decode json from strings
             json_files = []
@@ -97,7 +117,13 @@ class SSL:
             print(f"Execption occured during saving jsons: {ex}")
             return False
 
+if __name__ == '__main__':           
+    server = SSL()
 
+    print("Start mainLoop")
+    while True:
+        sleep(1)
+    
 
 
 
