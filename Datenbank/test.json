@@ -1,0 +1,7 @@
+{
+    "sensor_id":"2",
+    "sensor_name":"test ab web",
+    "sensor_type":"CO2","value1":"817",
+    "scale1":"0","unit1":"ppm",
+    "entry_document":"Yannic isch top"
+}
