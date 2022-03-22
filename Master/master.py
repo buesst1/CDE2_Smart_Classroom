@@ -326,7 +326,7 @@ while True:
 
     #start a ble request
     start_Time, jsons = ble.Start_Request()
-    new_measurement = json.dumps({"timeStamp":start_Time.strftime("%m/%d/%Y %H:%M:%S"), "data":jsons})  
+    new_measurement = json.dumps({"timeStamp":start_Time.strftime("%d/%m/%Y %H:%M:%S"), "data":jsons})  
 
     #read cached jsons
     cached_jsons = cache.Cache_Read() 

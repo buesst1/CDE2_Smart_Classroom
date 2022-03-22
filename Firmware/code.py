@@ -232,9 +232,6 @@ class Manager:
         self.__ble.Write_Message_Sync(message)
 
     def Read_Measures(self) -> dict:
-        measure_dict = {}
-        measure_dict["deviceName"] = self.__deviceName
-
         sensors = {}
 
         #if sensor active
@@ -299,9 +296,7 @@ class Manager:
 
             sensors["dht_sensor"] = dht_sensor
 
-        measure_dict["sensors"] = sensors
-
-        return measure_dict
+        return sensors
 
 manager = Manager([Sensors.SCD30_Sensor, Sensors.DHT_Sensor], "MainSensor")
 

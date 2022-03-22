@@ -1,9 +1,17 @@
+from datetime import datetime
 import json
 import threading
 import socket
 import ssl
 import os
 from time import sleep
+import smtplib
+import yaml
+
+class Error(object):
+    PhysicalConnectionerror = "physical_connection_error" #cannot communiacte with device
+    ReadFailure = "read_failed" #cannot read measurement
+    BleFailure = "BLE_error" #cannot connect to microcontroller over ble
 
 class SSL:
     def __init__(self, host="0.0.0.0", port = 443) -> None:
@@ -52,7 +60,6 @@ class SSL:
 
     def __handle_client(self, conn:ssl.SSLSocket):
         try:
-            #read message
             message = "" #message stored here
 
             #wait until bytes arrived
@@ -67,8 +74,6 @@ class SSL:
                     data = conn.recv(1)
                 else:
                     break
-
-            print("Message received!")
 
             splitted_msg = message.split("~")
 
@@ -108,21 +113,130 @@ class SSL:
 
     def __store_jsons(self, jsons_list:list) -> bool:
         try:
-            for json_ in jsons_list:
-                print(json_)
-
+            self.__input_jsons.extend(jsons_list)
             return True
 
         except Exception as ex:
             print(f"Execption occured during saving jsons: {ex}")
             return False
 
-if __name__ == '__main__':           
+    def Get_jsonBuffer(self):
+        jsons = self.__input_jsons.copy()
+
+        self.__input_jsons.clear()
+
+        return jsons
+
+class Database:
+    def __init__(self) -> None:
+        pass
+
+class Email:
+    def __init__(self, userName:str, password:str, receipents:list) -> None:
+        self.__password = password
+        self.__userName = userName
+        self.__receipents = receipents
+        
+    def Send_Email(self, target_emails:list, subject:str, message:str):
+        try:
+            sent_from = self.__userName
+            to = target_emails
+            subject_ = subject
+            body = message
+
+            email_text = """\
+                From: %s
+                To: %s
+                Subject: %s
+
+                %s
+                """ % (sent_from, ', '.join(to), subject_, body)
+
+            mail_server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+            mail_server.ehlo()
+            mail_server.login(self.__userName, self.__password)
+            mail_server.sendmail(sent_from, to, email_text)
+            mail_server.close()
+
+            print ('Email sent!')
+
+        except Exception as ex:
+            print (f'Something went wrong...: {ex}')
+
+    def __get_error_trace_back(self, json_stringified:json):
+        device_errors = {}
+        
+        json_ = json.loads(json_stringified)
+
+        time = datetime.strptime(json_["timeStamp"], "%d/%m/%Y %H:%M:%S")
+
+        data:json = json_["data"]
+
+        for deviceName in list(data.keys()):
+
+            deviceData = data[deviceName]
+
+            if deviceData != Error.BleFailure:
+
+                for sensorName in list(deviceData.keys()):
+                    sensorData = deviceData[sensorName]
+
+                    if sensorData != Error.PhysicalConnectionerror:
+
+                        for measurementName in list(sensorData.keys()):
+                            measurementData = sensorData[measurementName]
+
+                            if measurementData == Error.ReadFailure:
+                                deviceName_ = device_errors.get(deviceName, {})
+                                sensorName_ = deviceName_.get(sensorName, {})
+                                sensorName_[measurementName] = Error.ReadFailure
+
+                                deviceName_[sensorName] = sensorName_
+                                device_errors[deviceName] = deviceName_
+                                device_errors["timestamp"] = time
+
+                    else:
+                        deviceName_ = device_errors.get(deviceName, {})
+                        deviceName_[sensorName] = Error.PhysicalConnectionerror
+
+                        device_errors[deviceName] = deviceName_
+                        device_errors["timestamp"] = time
+
+            else:
+                device_errors[deviceName] = Error.BleFailure
+                device_errors["timestamp"] = time
+
+        return device_errors
+
+    def Send_Email_on_jsons_with_error(self, jsons:list):
+        for json_ in jsons:
+            traced_errors = self.__get_error_trace_back(json_)
+            
+            #error occured
+            if len(list(traced_errors.keys())) > 0:
+
+                message = f"Bei der Messung vom {traced_errors.pop('timestamp')}\nist folgender Fehler aufgetreten:\n\n\n{yaml.dump(traced_errors)}"
+
+                self.Send_Email(self.__receipents, "Smart Classroom Error Report", message)
+
+
+if __name__ == '__main__':      
     server = SSL()
+
+    with open(os.path.dirname(__file__) + "/creditals", "r") as fd:
+        creditals = fd.read().split("\n")
+
+    email = Email(creditals[0], creditals[1], ["tobias.buess2001@gmail.com"])
 
     print("Start mainLoop")
     while True:
+        jsons = server.Get_jsonBuffer()
+
+        if(len(jsons) > 0):
+            email.Send_Email_on_jsons_with_error(jsons)
+
         sleep(1)
+
     
 
 
