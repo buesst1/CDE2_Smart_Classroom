@@ -236,13 +236,12 @@ class Manager:
 
         #if sensor active
         if self.__scd_30_sensor != None:
-            scd_30_sensor = {}
-
             if self.__scd_30_sensor != Error.PhysicalConnectionerror: 
                 measurements = {}
 
                 try:
                     measurements["SCD_30_CO2"] = self.__scd_30_sensor.Read_CO2_PPM()
+                    #raise Exception("test")
                 except:
                     measurements["SCD_30_CO2"] = Error.ReadFailure
 
@@ -256,16 +255,12 @@ class Manager:
                 except:
                     measurements["SCD_30_TEMP"] = Error.ReadFailure
 
-                scd_30_sensor["measurements"] = measurements
+                sensors["scd_30_sensor"] = measurements
 
             else:
-                scd_30_sensor["measurements"] = Error.PhysicalConnectionerror
-
-            sensors["scd_30_sensor"] = scd_30_sensor
+                sensors["scd_30_sensor"]  = Error.PhysicalConnectionerror
 
         if self.__dht_sensor != None:
-            dht_sensor = {}
-
             if self.__dht_sensor != Error.PhysicalConnectionerror: 
                 measurements = {}
 
@@ -289,12 +284,10 @@ class Manager:
                 except:
                     measurements["DHT_HUM"] = Error.ReadFailure
 
-                dht_sensor["measurements"] = measurements
+                sensors["dht_sensor"] = measurements
 
             else:
-                dht_sensor["measurements"] = Error.PhysicalConnectionerror
-
-            sensors["dht_sensor"] = dht_sensor
+                sensors["dht_sensor"] = Error.PhysicalConnectionerror
 
         return sensors
 
