@@ -1,4 +1,6 @@
 from datetime import datetime
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 import json
 import threading
 import socket
@@ -12,6 +14,7 @@ class Error(object):
     PhysicalConnectionerror = "physical_connection_error" #cannot communiacte with device
     ReadFailure = "read_failed" #cannot read measurement
     BleFailure = "BLE_error" #cannot connect to microcontroller over ble
+    BatLowVoltage = "Battery_Low_Voltage" #battery is on a critical voltage level
 
 class SSL:
     def __init__(self, host="0.0.0.0", port = 443) -> None:
@@ -139,31 +142,28 @@ class Email:
         
     def Send_Email(self, target_emails:list, subject:str, message:str):
         try:
-            sent_from = self.__userName
-            to = target_emails
-            subject_ = subject
-            body = message
+            msg = MIMEMultipart()
+            msg['From'] = self.__userName
+            msg['To'] = ', '.join(target_emails)
+            msg['Subject'] = subject
+            msg.attach(MIMEText(message, 'plain'))
 
-            email_text = """\
-                From: %s
-                To: %s
-                Subject: %s
-
-                %s
-                """ % (sent_from, ', '.join(to), subject_, body)
-
-            mail_server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-            mail_server.ehlo()
-            mail_server.login(self.__userName, self.__password)
-            mail_server.sendmail(sent_from, to, email_text)
-            mail_server.close()
-
-            print ('Email sent!')
+            #Create SMTP session for sending the mail
+            session = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+            session.login(self.__userName, self.__password) #login with mail_id and password
+            text = msg.as_string()
+            session.sendmail(self.__userName, target_emails, text)
+            session.quit()
+            print('Mail Sent')
 
         except Exception as ex:
             print (f'Something went wrong...: {ex}')
 
-    def __get_error_trace_back(self, json_stringified:json):
+    def __get_error_trace_back(self, json_stringified:json, bat_voltage_lowError_threshold:float = 3.5):
+        """
+        bat_voltage_lowError_threshold -> you will get a warning as soon as you are lower or equal that threshold
+        """
+        
         device_errors = {}
         
         json_ = json.loads(json_stringified)
@@ -195,6 +195,16 @@ class Email:
                                 device_errors[deviceName] = deviceName_
                                 device_errors["timestamp"] = time
 
+                            elif measurementName == "bat_voltage":
+                                if float(measurementData) <= bat_voltage_lowError_threshold:
+                                    deviceName_ = device_errors.get(deviceName, {})
+                                    sensorName_ = deviceName_.get(sensorName, {})
+                                    sensorName_[measurementName] = f"{Error.BatLowVoltage} only {float(measurementData)}V"
+
+                                    deviceName_[sensorName] = sensorName_
+                                    device_errors[deviceName] = deviceName_
+                                    device_errors["timestamp"] = time
+
                     else:
                         deviceName_ = device_errors.get(deviceName, {})
                         deviceName_[sensorName] = Error.PhysicalConnectionerror
@@ -215,9 +225,9 @@ class Email:
             #error occured
             if len(list(traced_errors.keys())) > 0:
 
-                message = f"Bei der Messung vom {traced_errors.pop('timestamp')}\nist folgender Fehler aufgetreten:\n\n\n{yaml.dump(traced_errors)}"
+                message = f"Bei der Messung vom {traced_errors.pop('timestamp')}\nist/sind folgende(r) Fehler aufgetreten:\n\n\n{yaml.dump(traced_errors)}"
 
-                self.Send_Email(self.__receipents, "Smart Classroom Error Report", message)
+                self.Send_Email(self.__receipents, "Smart Classroom Error/Warning Report", message)
 
 
 if __name__ == '__main__':      

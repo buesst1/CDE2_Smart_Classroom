@@ -177,7 +177,17 @@ class Light_Sensor:
 
         return R_Sensor
 
+class Battery_Voltage:
+    def __init__(self, pin: board = board.A0, voltage_divider_ratio = 0.5):
+        self.__analogRead = AnalogIn(pin)
+        self.__divider_ratio = voltage_divider_ratio
+        self.__ref_voltage = self.__analogRead.reference_voltage
+
+    def Read_Voltage(self):
+        return ((self.__ref_voltage / 65536) * self.__analogRead.value) / self.__divider_ratio #calculate voltage on battery
+
 class Sensors(object):
+    BatteryVoltage = "Battery_Voltage"
     SCD30_Sensor = "CO2_Sensor"
     DHT_Sensor = "DHT_Sensor"
 
@@ -193,14 +203,16 @@ class Manager:
         """
 
         self.__sensors = sensors
+        self.__sensors.append(Sensors.BatteryVoltage)#append BatteryVoltage as default
+
         self.__deviceName = deviceName
         self.__ble = blueTooth(deviceName)
         self.__time_until_advertize_s = time_until_advertize_s
 
         #init sensor classes
-
         self.__scd_30_sensor = None
         self.__dht_sensor = None
+        self.__battery_voltage = None
 
         self.__Init_Sensors()
 
@@ -217,6 +229,12 @@ class Manager:
                 self.__dht_sensor = DHT_Temperature_Sensor(board.D5) #on development shield it is the pin D2
             except:
                 self.__dht_sensor = Error.PhysicalConnectionerror
+
+        if Sensors.BatteryVoltage in self.__sensors:
+            try:
+                self.__battery_voltage = Battery_Voltage() 
+            except:
+                self.__battery_voltage = Error.PhysicalConnectionerror
 
     def Wait_For_Connection_sync(self):
         """
@@ -289,6 +307,25 @@ class Manager:
             else:
                 sensors["dht_sensor"] = Error.PhysicalConnectionerror
 
+        if self.__battery_voltage != None:
+            if self.__battery_voltage != Error.PhysicalConnectionerror: 
+                measurements = {}
+
+                try:
+                    result = self.__battery_voltage.Read_Voltage()
+
+                    if result is None:
+                        raise Exception("Battery_Voltage failed to read")
+
+                    measurements["bat_voltage"] = result
+                except:
+                    measurements["bat_voltage"] = Error.ReadFailure
+
+                sensors["battery_voltage"] = measurements
+
+            else:
+                sensors["battery_voltage"] = Error.PhysicalConnectionerror
+
         return sensors
 
 manager = Manager([Sensors.SCD30_Sensor, Sensors.DHT_Sensor], "MainSensor")
@@ -305,6 +342,8 @@ while True:
         if message == "measure_request":
 
             stringified_json = json.dumps(manager.Read_Measures())
+
+            print("Message:\n", stringified_json)
 
             manager.Write_Message_To_BLE(stringified_json)
 
