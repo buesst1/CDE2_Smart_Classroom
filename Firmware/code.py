@@ -12,7 +12,7 @@ import alarm
 
 
 class blueTooth:
-    def __init__(self, deviceName: str, start_read_timeout_s=5):
+    def __init__(self, deviceName: str, start_read_timeout_s=10):
         self.__ble = BLERadio()
         self.__ble.name = deviceName
 

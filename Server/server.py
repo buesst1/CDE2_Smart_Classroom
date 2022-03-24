@@ -243,6 +243,7 @@ if __name__ == '__main__':
         jsons = server.Get_jsonBuffer()
 
         if(len(jsons) > 0):
+            print(jsons)
             email.Send_Email_on_jsons_with_error(jsons)
 
         sleep(1)
