@@ -38,10 +38,10 @@ class SSL:
         while data:
             if data != b"\n":
                 message += bytes.decode(data) 
-
-                data = conn.recv(1)
             else:
                 break
+
+            data = conn.recv(1)
 
 
         conn.shutdown(socket.SHUT_RDWR)

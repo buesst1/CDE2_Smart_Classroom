@@ -73,10 +73,10 @@ class SSL:
             while data:
                 if data != b"\n":
                     message += bytes.decode(data) 
-
-                    data = conn.recv(1)
                 else:
                     break
+
+                data = conn.recv(1)
 
             splitted_msg = message.split("~")
 
@@ -157,7 +157,7 @@ class Email:
             print('Mail Sent')
 
         except Exception as ex:
-            print (f'Something went wrong...: {ex}')
+            print (f'Something went wrong sending an Email: {ex}')
 
     def __get_error_trace_back(self, json_stringified:json, bat_voltage_lowError_threshold:float = 3.5):
         """
@@ -236,7 +236,7 @@ if __name__ == '__main__':
     with open(os.path.dirname(__file__) + "/creditals", "r") as fd:
         creditals = fd.read().split("\n")
 
-    email = Email(creditals[0], creditals[1], ["tobias.buess2001@gmail.com"])
+    email = Email(creditals[0], creditals[1], ["tobias.buess2001@gmail.com", "pjluca48@gmail.com"])
 
     print("Start mainLoop")
     while True:
