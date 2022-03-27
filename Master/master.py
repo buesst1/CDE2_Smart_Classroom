@@ -312,7 +312,7 @@ class BLE:
         return (timeStamp, jsons)
 
 server = SSL()
-ble = BLE(["MainSensor"])
+ble = BLE(["MainSensor", "SecondarySensor"])
 cache = Cache()
 
 while True:

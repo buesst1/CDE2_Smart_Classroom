@@ -6,7 +6,7 @@ import threading
 import socket
 import ssl
 import os
-from time import sleep
+from time import monotonic, sleep
 import smtplib
 import yaml
 
@@ -159,10 +159,37 @@ class Email:
         except Exception as ex:
             print (f'Something went wrong sending an Email: {ex}')
 
-    def __get_error_trace_back(self, json_stringified:json, bat_voltage_lowError_threshold:float = 3.5):
+    def Send_Status_email(self, traced_errors_list:list):
         """
-        bat_voltage_lowError_threshold -> you will get a warning as soon as you are lower or equal that threshold
+        Sends a status email with containing error messages 
         """
+        
+        #error in traced_errors
+        if len(traced_errors_list) > 0:
+
+            message = "Bei folgenden Messungen ist/sind folgende(r) Fehler aufgetreten:\n\n"
+
+            for traced_errors in traced_errors_list:
+                message += f"Zeitstempel: {traced_errors.pop('timestamp')}\n{yaml.dump(traced_errors)}\n\n"
+
+            self.Send_Email(self.__receipents, "Statusmeldung: Smart Classroom Error/Warning Report", message)
+
+        else:
+            self.Send_Email(self.__receipents, "Statusmeldung: OK", "Es sind soweit keine Fehler aufgetreten")
+
+    def Send_MasterTimeout_email(self):
+        """
+        This method sends an email containing the message of a master timeout
+        """
+        
+        self.Send_Email(self.__receipents, "Statusmeldung: Master Timeout", "Vom Master wurde eine längere Zeit keine Daten mehr empfangen...")
+
+class ErrorCheck:
+    def __init__(self, bat_voltage_lowError_threshold:float = 3.5) -> None:
+        self.__bat_voltage_lowError_threshold = bat_voltage_lowError_threshold #battery voltage threshold 
+        self.__error_traces = [] #errors that are collected are stored here
+
+    def __get_error_trace_back(self, json_stringified:json):
         
         device_errors = {}
         
@@ -196,7 +223,7 @@ class Email:
                                 device_errors["timestamp"] = time
 
                             elif measurementName == "bat_voltage":
-                                if float(measurementData) <= bat_voltage_lowError_threshold:
+                                if float(measurementData) <= self.__bat_voltage_lowError_threshold:
                                     deviceName_ = device_errors.get(deviceName, {})
                                     sensorName_ = deviceName_.get(sensorName, {})
                                     sensorName_[measurementName] = f"{Error.BatLowVoltage} only {float(measurementData)}V"
@@ -218,35 +245,77 @@ class Email:
 
         return device_errors
 
-    def Send_Email_on_jsons_with_error(self, jsons:list):
+    def CheckJsons_StoreErrors(self, jsons:list):
+        """
+        This method checks all measurements in json format for errors
+        """
+        
         for json_ in jsons:
-            traced_errors = self.__get_error_trace_back(json_)
-            
-            #error occured
-            if len(list(traced_errors.keys())) > 0:
+            error_trace_dict = self.__get_error_trace_back(json_)
 
-                message = f"Bei der Messung vom {traced_errors.pop('timestamp')}\nist/sind folgende(r) Fehler aufgetreten:\n\n\n{yaml.dump(traced_errors)}"
+            if len(list(error_trace_dict.keys())) > 0:
+                self.__error_traces.append(error_trace_dict)
 
-                self.Send_Email(self.__receipents, "Smart Classroom Error/Warning Report", message)
+    def GetErrors(self):
+        """
+        This method gets all errors collected during last error fetch
+        """
 
+        error_traces_copy = self.__error_traces.copy()
+        self.__error_traces.clear(); #clear all
 
-if __name__ == '__main__':      
+        return error_traces_copy
+
+        
+
+if __name__ == '__main__':    
+    #instances
     server = SSL()
+    checkError = ErrorCheck()
 
     with open(os.path.dirname(__file__) + "/creditals", "r") as fd:
         creditals = fd.read().split("\n")
+    email = Email(creditals[0], creditals[1], ["tobias.buess2001@gmail.com"]) #, "pjluca48@gmail.com"
 
-    email = Email(creditals[0], creditals[1], ["tobias.buess2001@gmail.com", "pjluca48@gmail.com"])
+    #constants
+    status_mail_intervall_min = 1 #sends a status email in a specific intervall
+    master_timeout_min = 1 #triggers an email with a masterTimeout message
 
+    #variables
+    time_last_jsons_received = monotonic()
+    master_timeout_mail_sent = False
+    
     print("Start mainLoop")
+    old_status_mail_time = monotonic()
     while True:
-        jsons = server.Get_jsonBuffer()
 
-        if(len(jsons) > 0):
-            print(jsons)
-            email.Send_Email_on_jsons_with_error(jsons)
+        try:
+            jsons = server.Get_jsonBuffer()
 
-        sleep(1)
+            #as soon as jsons received
+            if(len(jsons) > 0):
+                time_last_jsons_received = monotonic()
+                master_timeout_mail_sent = False #reset flag
+
+                #update database
+
+                checkError.CheckJsons_StoreErrors(jsons) #check for errors
+
+            #as soon as intervall reached
+            if monotonic() >= old_status_mail_time + (status_mail_intervall_min * 60):
+                old_status_mail_time = monotonic()
+
+                email.Send_Status_email(checkError.GetErrors())
+
+            #if master timeout occures
+            if (monotonic() >= time_last_jsons_received + (master_timeout_min * 60)) and not master_timeout_mail_sent:
+                master_timeout_mail_sent = True #set flag
+                email.Send_MasterTimeout_email()
+
+            sleep(1)
+
+        except Exception as ex:
+            print(f"Exception occured in mainLoop: {ex}")
 
     
 
