@@ -9,6 +9,7 @@ import os
 from time import monotonic, sleep
 import smtplib
 import yaml
+import requests
 
 class Error(object):
     PhysicalConnectionerror = "physical_connection_error" #cannot communiacte with device
@@ -266,7 +267,48 @@ class ErrorCheck:
 
         return error_traces_copy
 
+class DataBase:
+    def __init__(self, userName='SENSOR_DATALAKE2', password='smarTclassrooM2Da') -> None:
+        self.__userName = userName
+        self.__password = password
+
+    def __post(self, co2a1=None, co2a2=None, co2a3=None, co2b1=None, co2b2=None, co2b3=None, co2c1=None, co2c2=None, co2c3=None, fenstera1=None, fenstera2=None, fenstera3=None, fensterb1=None, fensterb2=None, licht1=None, licht2=None)
+        def data_to_string(data):
+            if data != None:
+                return str(data)
+
+            return "null"
         
+        data_dict = {
+                        "co2a1":data_to_string(co2a1),
+                        "co2a2":data_to_string(co2a2),
+                        "co2a3":data_to_string(co2a3),
+                        "co2b1":data_to_string(co2b1),
+                        "co2b2":data_to_string(co2b2),
+                        "co2b3":data_to_string(co2b3),
+                        "co2c1":data_to_string(co2c1),
+                        "co2c2":data_to_string(co2c2),
+                        "co2c3":data_to_string(co2c3),
+                        "fenstera1":data_to_string(fenstera1),
+                        "fenstera2":data_to_string(fenstera2),
+                        "fenstera3":data_to_string(fenstera3),
+                        "fensterb1":data_to_string(fensterb1),
+                        "fensterb2":data_to_string(fensterb2),
+                        "licht1":data_to_string(licht1),
+                        "licht2":data_to_string(licht2)
+                    }
+
+        r = requests.post('https://glusfqycvwrucp9-db202202211424.adb.eu-zurich-1.oraclecloudapps.com/ords/sensor_datalake2/sens/any_sensor_data_entry/',auth=(self.__userName, self.__password), data=data_dict)
+
+        #success
+        if r.status_code == 200:
+            return True
+        
+        #failed
+        return False
+        
+    def __send_single_measurement(measurement:json):
+        pass
 
 if __name__ == '__main__':    
     #instances
