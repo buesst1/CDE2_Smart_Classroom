@@ -96,6 +96,7 @@ class SCD30_Sensor:
     def __init__(self, i2c_address = 0x61):
         self.__i2c = busio.I2C(board.SCL, board.SDA, frequency=1000)  # for FT232H, use 1KHz
         self.__scd = adafruit_scd30.SCD30(self.__i2c, address=i2c_address)
+        self.__scd.measurement_interval = 25 #set measurement intervall to 25s
 
         self.__temp_celcius = None
         self.__relHum_percent = None
