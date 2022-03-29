@@ -1,8 +1,11 @@
+import math
 from time import monotonic, sleep
 from adafruit_ble import BLERadio
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 from adafruit_ble.services.nordic import UARTService
 from analogio import AnalogIn
+from digitalio import DigitalInOut
+from digitalio import Direction
 import adafruit_dht
 import adafruit_scd30
 import board
@@ -127,46 +130,18 @@ class SCD30_Sensor:
 
         return self.__temp_celcius
 
-class DHT_Temperature_Sensor:
-    def __init__(self, pin: board):
-        self.__dhtDevice = adafruit_dht.DHT11(pin)
-
-    def Read_Temp_Celcius(self):
-        counter = 0
-        while (True):
-
-            try:
-                return self.__dhtDevice.temperature
-            except:
-                pass
-
-
-            counter += 1
-
-            if counter >= 10:
-                raise Exception("Sensor failed to read")
-
-    def Read_Humidity_Percent(self):
-        counter = 0
-        while (True):
-
-            try:
-                return self.__dhtDevice.humidity
-
-            except:
-                pass
-
-
-            counter += 1
-
-            if counter >= 10:
-                raise Exception("Sensor failed to read")
-
 class Light_Sensor:
-    def __init__(self, pin: board):
+    def __init__(self, pin: board, m=-1.353984, q=2.407590):
+        """
+        m,q calculated with diagram from SEN-09088.pdf
+        """
+
         self.__analogRead = AnalogIn(pin)
 
-    def _Read_Resistance_Ohms(self):
+        self.__m = m
+        self.__q = q
+
+    def __Read_Resistance_Ohms(self):
         ref_voltage = self.__analogRead.reference_voltage
         voltage_R1 = (ref_voltage / 65536) * self.__analogRead.value #calculate voltage on pin
         voltage_Sensor = ref_voltage - voltage_R1
@@ -177,6 +152,13 @@ class Light_Sensor:
 
         return R_Sensor
 
+    def Get_Light_Strength_Lux(self):
+        log_resistance = math.log10(self.__Read_Resistance_Ohms())
+
+        log_lux = self.__m*log_resistance + self.__q
+
+        return 10^log_lux
+
 class Battery_Voltage:
     def __init__(self, pin: board = board.A0, voltage_divider_ratio = 0.5):
         self.__analogRead = AnalogIn(pin)
@@ -186,17 +168,47 @@ class Battery_Voltage:
     def Read_Voltage(self):
         return ((self.__ref_voltage / 65536) * self.__analogRead.value) / self.__divider_ratio #calculate voltage on battery
 
+class Magnetic_Sensors:
+    def __init__(self, pinS1:board, pinS2:board, pinS3:board, pinS4:board, pinS5:board) -> None:
+        self.__sensor1 = DigitalInOut(pinS1)
+        self.__sensor1.direction = Direction.INPUT
+        self.__sensor1.pull = DigitalInOut.pull.UP
+
+        self.__sensor2 = DigitalInOut(pinS2)
+        self.__sensor2.direction = Direction.INPUT
+        self.__sensor2.pull = DigitalInOut.pull.UP
+
+        self.__sensor3 = DigitalInOut(pinS3)
+        self.__sensor3.direction = Direction.INPUT
+        self.__sensor3.pull = DigitalInOut.pull.UP
+
+        self.__sensor4 = DigitalInOut(pinS4)
+        self.__sensor4.direction = Direction.INPUT
+        self.__sensor4.pull = DigitalInOut.pull.UP
+
+        self.__sensor5 = DigitalInOut(pinS5)
+        self.__sensor5.direction = Direction.INPUT
+        self.__sensor5.pull = DigitalInOut.pull.UP
+
+    def Read_Sensors(self) -> tuple:
+        """
+        This methods reads all Sensors and returns a tuple of the sensor states [0] = state of sensor1 -> True (Logical 1 on pin)
+        """
+        
+        return (self.__sensor1.value, self.__sensor2.value, self.__sensor3.value, self.__sensor4.value, self.__sensor5.value)
+
 class Sensors(object):
     BatteryVoltage = "Battery_Voltage"
     SCD30_Sensor = "CO2_Sensor"
-    DHT_Sensor = "DHT_Sensor"
+    MagneticSensors = "Magnetic_Sensors"
+    LightSensor = "Light_Sensor"
 
 class Error(object):
     PhysicalConnectionerror = "physical_connection_error" #cannot communiacte with device
     ReadFailure = "read_failed" #cannot read measurement
 
 class Manager:
-    def __init__(self, sensors: list, deviceName: str, time_until_advertize_s = 15):
+    def __init__(self, sensors: list, deviceName: str):
         """
         parameter:
         sensors (list of Sensors to activate)
@@ -206,12 +218,12 @@ class Manager:
         self.__sensors.append(Sensors.BatteryVoltage)#append BatteryVoltage as default
 
         self.__deviceName = deviceName
-        self.__ble = blueTooth(deviceName)
-        self.__time_until_advertize_s = time_until_advertize_s
+        self.__ble = blueTooth(self.__deviceName)
 
         #init sensor classes
         self.__scd_30_sensor = None
-        self.__dht_sensor = None
+        self.__magnetic_sensor = None
+        self.__light_sensor = None
         self.__battery_voltage = None
 
         self.__Init_Sensors()
@@ -224,11 +236,17 @@ class Manager:
 
                 self.__scd_30_sensor = Error.PhysicalConnectionerror
 
-        if Sensors.DHT_Sensor in self.__sensors:
+        if Sensors.MagneticSensors in self.__sensors:
             try:
-                self.__dht_sensor = DHT_Temperature_Sensor(board.D5) #on development shield it is the pin D2
+                self.__magnetic_sensor = Magnetic_Sensors() 
             except:
-                self.__dht_sensor = Error.PhysicalConnectionerror
+                self.__magnetic_sensor = Error.PhysicalConnectionerror
+
+        if Sensors.LightSensor in self.__sensors:
+            try:
+                self.__light_sensor = Light_Sensor() 
+            except:
+                self.__light_sensor = Error.PhysicalConnectionerror
 
         if Sensors.BatteryVoltage in self.__sensors:
             try:
@@ -278,34 +296,48 @@ class Manager:
             else:
                 sensors["scd_30_sensor"]  = Error.PhysicalConnectionerror
 
-        if self.__dht_sensor != None:
-            if self.__dht_sensor != Error.PhysicalConnectionerror: 
+        if self.__magnetic_sensor != None:
+            if self.__magnetic_sensor != Error.PhysicalConnectionerror: 
                 measurements = {}
 
                 try:
-                    result = self.__dht_sensor.Read_Temp_Celcius()
+                    result = self.__magnetic_sensor.Read_Sensors()
 
-                    if result is None:
-                        raise Exception("DHT_Temperature failed to read")
+                    measurements["MS_S1"] = result[0]
+                    measurements["MS_S2"] = result[1]
+                    measurements["MS_S3"] = result[2]
+                    measurements["MS_S4"] = result[3]
+                    measurements["MS_S5"] = result[4]
 
-                    measurements["DHT_TEMP"] = result
                 except:
-                    measurements["DHT_TEMP"] = Error.ReadFailure
+                    measurements["MS_S1"] = Error.ReadFailure
+                    measurements["MS_S2"] = Error.ReadFailure
+                    measurements["MS_S3"] = Error.ReadFailure
+                    measurements["MS_S4"] = Error.ReadFailure
+                    measurements["MS_S5"] = Error.ReadFailure
 
-                try:
-                    result = self.__dht_sensor.Read_Humidity_Percent()
-
-                    if result is None:
-                        raise Exception("DHT_Humidity failed to read")
-
-                    measurements["DHT_HUM"] = result
-                except:
-                    measurements["DHT_HUM"] = Error.ReadFailure
-
-                sensors["dht_sensor"] = measurements
+                sensors["magnetic_sensors"] = measurements
 
             else:
-                sensors["dht_sensor"] = Error.PhysicalConnectionerror
+                sensors["magnetic_sensors"] = Error.PhysicalConnectionerror
+
+        if self.__light_sensor != None:
+            if self.__light_sensor != Error.PhysicalConnectionerror: 
+                measurements = {}
+
+                try:
+                    result = self.__light_sensor.Get_Light_Strength_Lux()
+
+                    measurements["LS_lightStrength"] = result
+
+                except:
+                    measurements["LS_lightStrength"] = Error.ReadFailure
+
+
+                sensors["light_sensor"] = measurements
+
+            else:
+                sensors["light_sensor"] = Error.PhysicalConnectionerror
 
         if self.__battery_voltage != None:
             if self.__battery_voltage != Error.PhysicalConnectionerror: 
@@ -328,7 +360,25 @@ class Manager:
 
         return sensors
 
-manager = Manager([Sensors.SCD30_Sensor, Sensors.DHT_Sensor], "MainSensor")
+with open("config", "r") as fd:
+    lines = fd.readlines()
+
+deviceName = lines[0]
+sensors = list(lines[1].split(","))
+
+for sensor in sensors:
+    if sensor == Sensors.LightSensor:
+        continue
+
+    elif sensor == Sensors.MagneticSensors:
+        continue
+
+    elif sensor == Sensors.SCD30_Sensor:
+        continue
+
+    raise Exception("Unknown sensor in config file")
+
+manager = Manager(sensors, deviceName)
 
 while True:
     try:
