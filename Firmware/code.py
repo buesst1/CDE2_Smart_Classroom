@@ -6,6 +6,7 @@ from adafruit_ble.services.nordic import UARTService
 from analogio import AnalogIn
 from digitalio import DigitalInOut
 from digitalio import Direction
+from digitalio import Pull
 import adafruit_dht
 import adafruit_scd30
 import board
@@ -131,7 +132,7 @@ class SCD30_Sensor:
         return self.__temp_celcius
 
 class Light_Sensor:
-    def __init__(self, pin: board, m=-1.353984, q=2.407590):
+    def __init__(self, pin=board.A2, m=-1.353984, q=2.407590):
         """
         m,q calculated with diagram from SEN-09088.pdf
         """
@@ -153,12 +154,16 @@ class Light_Sensor:
         return R_Sensor
 
     def Get_Light_Strength_Lux(self):
-        log_resistance = math.log10(self.__Read_Resistance_Ohms())
+        try:
+            log_resistance = math.log(self.__Read_Resistance_Ohms(), 10)
 
-        log_lux = self.__m*log_resistance + self.__q
+            log_lux = self.__m*log_resistance + self.__q
 
-        return 10^log_lux
+            return 10**log_lux
 
+        except Exception as ex:
+            print(ex)
+        
 class Battery_Voltage:
     def __init__(self, pin: board = board.A0, voltage_divider_ratio = 0.5):
         self.__analogRead = AnalogIn(pin)
@@ -169,26 +174,26 @@ class Battery_Voltage:
         return ((self.__ref_voltage / 65536) * self.__analogRead.value) / self.__divider_ratio #calculate voltage on battery
 
 class Magnetic_Sensors:
-    def __init__(self, pinS1:board, pinS2:board, pinS3:board, pinS4:board, pinS5:board) -> None:
+    def __init__(self, pinS1=board.D5, pinS2=board.D6, pinS3=board.D9, pinS4=board.D10, pinS5=board.D11) -> None:
         self.__sensor1 = DigitalInOut(pinS1)
         self.__sensor1.direction = Direction.INPUT
-        self.__sensor1.pull = DigitalInOut.pull.UP
+        self.__sensor1.pull = Pull.UP
 
         self.__sensor2 = DigitalInOut(pinS2)
         self.__sensor2.direction = Direction.INPUT
-        self.__sensor2.pull = DigitalInOut.pull.UP
+        self.__sensor2.pull = Pull.UP
 
         self.__sensor3 = DigitalInOut(pinS3)
         self.__sensor3.direction = Direction.INPUT
-        self.__sensor3.pull = DigitalInOut.pull.UP
+        self.__sensor3.pull = Pull.UP
 
         self.__sensor4 = DigitalInOut(pinS4)
         self.__sensor4.direction = Direction.INPUT
-        self.__sensor4.pull = DigitalInOut.pull.UP
+        self.__sensor4.pull = Pull.UP
 
         self.__sensor5 = DigitalInOut(pinS5)
         self.__sensor5.direction = Direction.INPUT
-        self.__sensor5.pull = DigitalInOut.pull.UP
+        self.__sensor5.pull = Pull.UP
 
     def Read_Sensors(self) -> tuple:
         """
@@ -233,13 +238,12 @@ class Manager:
             try:
                 self.__scd_30_sensor = SCD30_Sensor()
             except:
-
                 self.__scd_30_sensor = Error.PhysicalConnectionerror
 
         if Sensors.MagneticSensors in self.__sensors:
             try:
                 self.__magnetic_sensor = Magnetic_Sensors() 
-            except:
+            except Exception as ex:
                 self.__magnetic_sensor = Error.PhysicalConnectionerror
 
         if Sensors.LightSensor in self.__sensors:
@@ -360,11 +364,16 @@ class Manager:
 
         return sensors
 
+
+#read deviceName and sensors to activate
 with open("config", "r") as fd:
     lines = fd.readlines()
 
-deviceName = lines[0]
-sensors = list(lines[1].split(","))
+deviceName = lines[0].strip("\r\n")
+sensors = []
+
+for sens_str in lines[1].split(","):
+    sensors.append(sens_str.strip("\r\n"))
 
 for sensor in sensors:
     if sensor == Sensors.LightSensor:
@@ -382,6 +391,7 @@ manager = Manager(sensors, deviceName)
 
 while True:
     try:
+        print("Wait for a connection")
         #wait for a ble connection
         manager.Wait_For_Connection_sync() 
     
@@ -401,7 +411,7 @@ while True:
             raise Exception("Unknown command received")
         
         #go in light sleep
-        time_alarm = alarm.time.TimeAlarm(monotonic_time=monotonic() + 10)
+        time_alarm = alarm.time.TimeAlarm(monotonic_time=monotonic() + 20)
         alarm.light_sleep_until_alarms(time_alarm)
 
     except Exception as ex:

@@ -31,36 +31,37 @@ class SSL:
         self.__listener_thread.start()  
 
     def __listener(self):
-        try:
-            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-            context.load_cert_chain(self.__dirname + r'\\SSL\\certificate.crt', self.__dirname + r'\\SSL\\certificate.key')
+        while True:
+            try:
+                context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+                context.load_cert_chain(self.__dirname + r'\\SSL\\certificate.crt', self.__dirname + r'\\SSL\\certificate.key')
 
-            bindsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
-            bindsocket.bind((self.HOST, self.PORT))
-            bindsocket.listen(5)
+                bindsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+                bindsocket.bind((self.HOST, self.PORT))
+                bindsocket.listen(5)
 
-            while True:
-                print("listening")
-                newsocket, fromaddr = bindsocket.accept()
-                print("accepted")
+                while True:
+                    print("listening")
+                    newsocket, fromaddr = bindsocket.accept()
+                    print("accepted")
 
-                connstream = context.wrap_socket(newsocket, server_side=True)
+                    connstream = context.wrap_socket(newsocket, server_side=True)
 
-                try:
-                    self.__handle_client(connstream)
+                    try:
+                        self.__handle_client(connstream)
 
-                except Exception as ex:
-                    print(f"Exception occured during accepting client: {ex}")
+                    except Exception as ex:
+                        print(f"Exception occured during accepting client: {ex}")
 
-                finally:
-                    connstream.shutdown(socket.SHUT_RDWR)
-                    connstream.close()
+                    finally:
+                        connstream.shutdown(socket.SHUT_RDWR)
+                        connstream.close()
 
-                    print("connection closed")
-                        
+                        print("connection closed")
+                    
 
-        except Exception as ex:
-            print(f"Critical error in listener thread (exit thread): {ex}")
+            except Exception as ex:
+                print(f"Critical error in listener thread: {ex}")
 
     def __handle_client(self, conn:ssl.SSLSocket):
         try:
@@ -191,7 +192,6 @@ class ErrorCheck:
         self.__error_traces = [] #errors that are collected are stored here
 
     def __get_error_trace_back(self, json_stringified:json):
-        
         device_errors = {}
         
         json_ = json.loads(json_stringified)
@@ -272,7 +272,7 @@ class DataBase:
         self.__userName = userName
         self.__password = password
 
-    def __post(self, co2a1=None, co2a2=None, co2a3=None, co2b1=None, co2b2=None, co2b3=None, co2c1=None, co2c2=None, co2c3=None, fenstera1=None, fenstera2=None, fenstera3=None, fensterb1=None, fensterb2=None, licht1=None, licht2=None)
+    def __post(self, co2a1=None, co2a2=None, co2a3=None, co2b1=None, co2b2=None, co2b3=None, co2c1=None, co2c2=None, co2c3=None, fenstera1=None, fenstera2=None, fenstera3=None, fensterb1=None, fensterb2=None, licht1=None, licht2=None):
         def data_to_string(data):
             if data != None:
                 return str(data)
@@ -308,7 +308,44 @@ class DataBase:
         return False
         
     def __send_single_measurement(measurement:json):
-        pass
+        co2a1=None, 
+        co2a2=None, 
+        co2a3=None, 
+        co2b1=None, 
+        co2b2=None, 
+        co2b3=None, 
+        co2c1=None, 
+        co2c2=None, 
+        co2c3=None, 
+        fenstera1=None, 
+        fenstera2=None, 
+        fenstera3=None, 
+        fensterb1=None, 
+        fensterb2=None, 
+        licht1=None, 
+        licht2=None
+
+        data:json = measurement["data"]
+
+        time = datetime.strptime(measurement["timeStamp"], "%d/%m/%Y %H:%M:%S")
+
+        for deviceName in list(data.keys()):
+
+            deviceData = data[deviceName]
+
+            if deviceData != Error.BleFailure:
+
+                for sensorName in list(deviceData.keys()):
+                    sensorData = deviceData[sensorName]
+
+                    if sensorData != Error.PhysicalConnectionerror:
+
+                        for measurementName in list(sensorData.keys()):
+                            measurementData = sensorData[measurementName]
+
+                            if measurementData != Error.ReadFailure:
+                                measurementData
+
 
 if __name__ == '__main__':    
     #instances
@@ -326,12 +363,18 @@ if __name__ == '__main__':
     #variables
     time_last_jsons_received = monotonic()
     master_timeout_mail_sent = False
+    measurements_database_failed = [] #failed measurements stored here
     
     print("Start mainLoop")
     old_status_mail_time = monotonic()
     while True:
 
         try:
+            if len(measurements_database_failed) > 0:
+                measurement = measurements_database_failed.pop()
+
+                #update measurement 
+
             jsons = server.Get_jsonBuffer()
 
             #as soon as jsons received
@@ -340,6 +383,7 @@ if __name__ == '__main__':
                 master_timeout_mail_sent = False #reset flag
 
                 #update database
+                print(jsons)
 
                 checkError.CheckJsons_StoreErrors(jsons) #check for errors
 
