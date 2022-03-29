@@ -31,36 +31,37 @@ class SSL:
         self.__listener_thread.start()  
 
     def __listener(self):
-        try:
-            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-            context.load_cert_chain(self.__dirname + r'\\SSL\\certificate.crt', self.__dirname + r'\\SSL\\certificate.key')
+        while True:
+            try:
+                context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+                context.load_cert_chain(self.__dirname + r'\\SSL\\certificate.crt', self.__dirname + r'\\SSL\\certificate.key')
 
-            bindsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
-            bindsocket.bind((self.HOST, self.PORT))
-            bindsocket.listen(5)
+                bindsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+                bindsocket.bind((self.HOST, self.PORT))
+                bindsocket.listen(5)
 
-            while True:
-                print("listening")
-                newsocket, fromaddr = bindsocket.accept()
-                print("accepted")
+                while True:
+                    print("listening")
+                    newsocket, fromaddr = bindsocket.accept()
+                    print("accepted")
 
-                connstream = context.wrap_socket(newsocket, server_side=True)
+                    connstream = context.wrap_socket(newsocket, server_side=True)
 
-                try:
-                    self.__handle_client(connstream)
+                    try:
+                        self.__handle_client(connstream)
 
-                except Exception as ex:
-                    print(f"Exception occured during accepting client: {ex}")
+                    except Exception as ex:
+                        print(f"Exception occured during accepting client: {ex}")
 
-                finally:
-                    connstream.shutdown(socket.SHUT_RDWR)
-                    connstream.close()
+                    finally:
+                        connstream.shutdown(socket.SHUT_RDWR)
+                        connstream.close()
 
-                    print("connection closed")
-                        
+                        print("connection closed")
+                    
 
-        except Exception as ex:
-            print(f"Critical error in listener thread (exit thread): {ex}")
+            except Exception as ex:
+                print(f"Critical error in listener thread: {ex}")
 
     def __handle_client(self, conn:ssl.SSLSocket):
         try:
@@ -362,12 +363,18 @@ if __name__ == '__main__':
     #variables
     time_last_jsons_received = monotonic()
     master_timeout_mail_sent = False
+    measurements_database_failed = [] #failed measurements stored here
     
     print("Start mainLoop")
     old_status_mail_time = monotonic()
     while True:
 
         try:
+            if len(measurements_database_failed) > 0:
+                measurement = measurements_database_failed.pop()
+
+                #update measurement 
+
             jsons = server.Get_jsonBuffer()
 
             #as soon as jsons received

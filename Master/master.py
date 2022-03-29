@@ -9,6 +9,7 @@ from adafruit_ble import BLEConnection
 import adafruit_ble
 import json
 import os
+from iterators import TimeoutIterator
 
 class SSL:
     def __init__(self, host= 'solarbroom.com', port= 443) -> None:
@@ -20,8 +21,6 @@ class SSL:
 
         bindsocket = socket.create_connection((self.HOST, self.PORT), timeout=5)
         conn = context.wrap_socket(bindsocket, server_hostname=self.HOST)
-
-        print(bindsocket.timeout)
 
         message_bytes = str.encode(message + "\n") #convert to bytes
         
@@ -177,14 +176,27 @@ class BLE:
         # PyLint can't find BLERadio for some reason so special case it here.
         self.__ble = adafruit_ble.BLERadio()  # pylint: disable=no-member
 
-    def __Scan_For_Advertizements(self) -> dict:
+    def __Scan_For_Advertizements(self, timeout_s=10) -> dict:
+        """
+        Scan for advertizements 
 
+        params:
+        timeout: timeout of scanning (iteratorTimeout = timeout_s + 2; scanTimeout = timeout_s)
+        """
+        
         measurement_device_advertizements = {} #advertizements of measurement devices are stored here
 
         try:
             print("scanning")
             found_addr = set()
-            for advertisement in self.__ble.start_scan(ProvideServicesAdvertisement, timeout=60):
+            it = TimeoutIterator(self.__ble.start_scan(ProvideServicesAdvertisement, timeout=timeout_s), timeout_s + 2) #TimeoutIterator used because of: self.__ble.start_scan does not yield anything if nothign is found 
+            for advertisement in it: 
+                
+                #timeout received
+                if advertisement == it.get_sentinel():
+                    print("Iterator timed out... interrupt")
+                    break
+
                 addr = advertisement.address
 
                 if addr not in found_addr:
@@ -205,11 +217,19 @@ class BLE:
             print(f"Exception occured in __Scan_For_Advertizements: {ex} ->  restarting bluetooth")
             os.system("sudo /etc/init.d/bluetooth  restart")
 
+        self.__Stop_Scan_Save()
+
         print("scan done")
 
         return measurement_device_advertizements
 
-    def __TryConnect_ToDevice(self, device_advertisements: ProvideServicesAdvertisement) -> list:
+    def __Stop_Scan_Save(self):
+        try:
+            self.__ble.stop_scan()
+        except:
+            pass
+
+    def __TryConnect_ToDevice(self, device_advertisements: ProvideServicesAdvertisement, timeout=10) -> list:
         """
         This method tries to connect to all advertizements
 
@@ -221,12 +241,12 @@ class BLE:
             if UARTService not in device_advertisements.services:
                 raise Exception("UART not available for this device")
 
-            return self.__ble.connect(device_advertisements)
+            return self.__ble.connect(device_advertisements, timeout=timeout)
 
         except Exception as ex:
             print(f"Was unable to connect to device:\n{ex}")
             return None
-        
+
     def __Disconnect_FromDevice_Save(self, connection: BLEConnection):
         try:
             connection.disconnect()
@@ -280,7 +300,7 @@ class BLE:
 
         return json_response
                 
-    def Start_Request(self):
+    def Start_Request(self, max_number_of_tries:int = 5):
         jsons:json = json.loads(json.dumps({deviceName:"BLE_error" for deviceName in self.__device_names})) #create json 
 
         adverts = self.__Scan_For_Advertizements()
@@ -289,32 +309,37 @@ class BLE:
         for deviceName in list(adverts.keys()):
             ad = adverts[deviceName]
 
-            connection = self.__TryConnect_ToDevice(ad)
+            number_of_tries = 0
+            while number_of_tries < max_number_of_tries:
 
-            if (connection != None):
-                answer = self.__Request_Measurements_from_connection(connection)
+                connection = self.__TryConnect_ToDevice(ad)
 
-                self.__Disconnect_FromDevice_Save(connection) #disconnect if a connection was opened
+                if (connection != None):
+                    answer = self.__Request_Measurements_from_connection(connection)
 
-                #getting data was successful
-                if answer != None:
-                    jsons[deviceName] = answer
+                    self.__Disconnect_FromDevice_Save(connection) #disconnect if a connection was opened
 
-            else:
-                print(f"Was unable to connect to {deviceName}")
+                    #getting data was successful
+                    if answer != None:
+                        jsons[deviceName] = answer
+                        
+                        break #end 
 
-            
+                else:
+                    print(f"Was unable to connect to {deviceName}")
+
+                number_of_tries += 1 #increment counter
 
         return (timeStamp, jsons)
 
 server = SSL()
-ble = BLE(["MainSensor", "SecondarySensor"])
+ble = BLE(["Sensor1", "Sensor3"])
 cache = Cache()
 
 while True:
     #wait 10s
     timestamp = monotonic()
-    while (monotonic() - timestamp) < 15:
+    while (monotonic() - timestamp) < 30:
         sleep(1)
 
     #start measurement

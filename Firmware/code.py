@@ -132,7 +132,7 @@ class SCD30_Sensor:
         return self.__temp_celcius
 
 class Light_Sensor:
-    def __init__(self, pin: board, m=-1.353984, q=2.407590):
+    def __init__(self, pin=board.A2, m=-1.353984, q=2.407590):
         """
         m,q calculated with diagram from SEN-09088.pdf
         """
@@ -154,12 +154,16 @@ class Light_Sensor:
         return R_Sensor
 
     def Get_Light_Strength_Lux(self):
-        log_resistance = math.log10(self.__Read_Resistance_Ohms())
+        try:
+            log_resistance = math.log(self.__Read_Resistance_Ohms(), 10)
 
-        log_lux = self.__m*log_resistance + self.__q
+            log_lux = self.__m*log_resistance + self.__q
 
-        return 10^log_lux
+            return 10**log_lux
 
+        except Exception as ex:
+            print(ex)
+        
 class Battery_Voltage:
     def __init__(self, pin: board = board.A0, voltage_divider_ratio = 0.5):
         self.__analogRead = AnalogIn(pin)
@@ -407,7 +411,7 @@ while True:
             raise Exception("Unknown command received")
         
         #go in light sleep
-        time_alarm = alarm.time.TimeAlarm(monotonic_time=monotonic() + 10)
+        time_alarm = alarm.time.TimeAlarm(monotonic_time=monotonic() + 20)
         alarm.light_sleep_until_alarms(time_alarm)
 
     except Exception as ex:
