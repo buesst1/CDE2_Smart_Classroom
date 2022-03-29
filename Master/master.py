@@ -184,7 +184,7 @@ class BLE:
         try:
             print("scanning")
             found_addr = set()
-            for advertisement in self.__ble.start_scan(ProvideServicesAdvertisement, timeout=5):
+            for advertisement in self.__ble.start_scan(ProvideServicesAdvertisement, timeout=60):
                 addr = advertisement.address
 
                 if addr not in found_addr:
@@ -202,12 +202,8 @@ class BLE:
                         print(f"Device with name: {name} and address: {addr} found")
 
         except Exception as ex:
-            print(f"Exception occured in __Scan_For_Advertizements: {ex}")
-
-        try:
-            self.__ble.stop_scan()
-        except:
-            pass
+            print(f"Exception occured in __Scan_For_Advertizements: {ex} ->  restarting bluetooth")
+            os.system("sudo /etc/init.d/bluetooth  restart")
 
         print("scan done")
 

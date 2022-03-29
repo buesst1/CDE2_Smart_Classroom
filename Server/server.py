@@ -191,7 +191,6 @@ class ErrorCheck:
         self.__error_traces = [] #errors that are collected are stored here
 
     def __get_error_trace_back(self, json_stringified:json):
-        
         device_errors = {}
         
         json_ = json.loads(json_stringified)
@@ -272,7 +271,7 @@ class DataBase:
         self.__userName = userName
         self.__password = password
 
-    def __post(self, co2a1=None, co2a2=None, co2a3=None, co2b1=None, co2b2=None, co2b3=None, co2c1=None, co2c2=None, co2c3=None, fenstera1=None, fenstera2=None, fenstera3=None, fensterb1=None, fensterb2=None, licht1=None, licht2=None)
+    def __post(self, co2a1=None, co2a2=None, co2a3=None, co2b1=None, co2b2=None, co2b3=None, co2c1=None, co2c2=None, co2c3=None, fenstera1=None, fenstera2=None, fenstera3=None, fensterb1=None, fensterb2=None, licht1=None, licht2=None):
         def data_to_string(data):
             if data != None:
                 return str(data)
@@ -308,7 +307,44 @@ class DataBase:
         return False
         
     def __send_single_measurement(measurement:json):
-        pass
+        co2a1=None, 
+        co2a2=None, 
+        co2a3=None, 
+        co2b1=None, 
+        co2b2=None, 
+        co2b3=None, 
+        co2c1=None, 
+        co2c2=None, 
+        co2c3=None, 
+        fenstera1=None, 
+        fenstera2=None, 
+        fenstera3=None, 
+        fensterb1=None, 
+        fensterb2=None, 
+        licht1=None, 
+        licht2=None
+
+        data:json = measurement["data"]
+
+        time = datetime.strptime(measurement["timeStamp"], "%d/%m/%Y %H:%M:%S")
+
+        for deviceName in list(data.keys()):
+
+            deviceData = data[deviceName]
+
+            if deviceData != Error.BleFailure:
+
+                for sensorName in list(deviceData.keys()):
+                    sensorData = deviceData[sensorName]
+
+                    if sensorData != Error.PhysicalConnectionerror:
+
+                        for measurementName in list(sensorData.keys()):
+                            measurementData = sensorData[measurementName]
+
+                            if measurementData != Error.ReadFailure:
+                                measurementData
+
 
 if __name__ == '__main__':    
     #instances
@@ -340,6 +376,7 @@ if __name__ == '__main__':
                 master_timeout_mail_sent = False #reset flag
 
                 #update database
+                print(jsons)
 
                 checkError.CheckJsons_StoreErrors(jsons) #check for errors
 
