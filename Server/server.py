@@ -163,10 +163,10 @@ class Database:
                 return "null"
 
             if (value == True):
-                return "1"
+                return 1
 
             elif(value == False):
-                return "0"
+                return 0
 
         data_dict = {
             "inserttime": timeStamp.strftime("%d-%b-%Y %H:%M:%S %p"),
@@ -188,8 +188,8 @@ class Database:
             "device2light": convert_nullable_float(device2light),
             "device3light": convert_nullable_float(device3light)
         }
-
-        r = requests.post('https://glusfqycvwrucp9-db202202211424.adb.eu-zurich-1.oraclecloudapps.com/ords/sensor_datalake2/sens/any_sensor_data_entry/',auth=(self.__userName, self.__password), data=data_dict)
+        
+        r = requests.post('https://glusfqycvwrucp9-db202202211424.adb.eu-zurich-1.oraclecloudapps.com/ords/sensor_datalake2/sens/any_sensor_data_entry/',auth=(self.__userName, self.__password), data=json.dumps(data_dict))
 
         if r.raise_for_status() == None:
             return True
@@ -220,9 +220,11 @@ class Database:
             device2light = None
             device3light = None
 
-            data:json = measurement["data"]
+            measurement_json = json.loads(measurement)
 
-            inserttime = datetime.strptime(measurement["timeStamp"], "%d/%m/%Y %H:%M:%S")
+            data:json = measurement_json["data"]
+
+            inserttime = datetime.strptime(measurement_json["timeStamp"], "%d/%m/%Y %H:%M:%S")
 
             for deviceName in list(data.keys()):
 
@@ -340,10 +342,11 @@ class Database:
                                         print(f"Unknown device name received: {deviceName}")
 
             return self.__post(
-                                inserttime, device1humidity, device1co2, device1temp, device2humidity, 
-                                device2co2, device2temp, device3humidity, device3co2, device3temp, 
-                                device3window1a, device3window2b, device3window3a, device3window4b, 
-                                device3window5a, device1light, device2light, device3light
+                                inserttime, 
+                                device1humidity, device1co2, device1temp, device1light, 
+                                device2humidity, device2co2, device2temp, device2light, 
+                                device3humidity, device3co2, device3temp, device3light,
+                                device3window1a, device3window2b, device3window3a, device3window4b, device3window5a
                             )
 
         except Exception as ex:
@@ -519,7 +522,6 @@ if __name__ == '__main__':
                 if not db.Send_single_measurement(measurement):
                     measurements_database_failed.append(measurement)
                 
-
             jsons = server.Get_jsonBuffer()
 
             #as soon as jsons received

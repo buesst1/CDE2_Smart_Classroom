@@ -322,8 +322,13 @@ class BLE:
                     #getting data was successful
                     if answer != None:
                         jsons[deviceName] = answer
+
+                        print(f"Successfully got data from {deviceName}")
+
+                    else:
+                        print(f"Successfully connected to {deviceName} but was unable to get data")
                         
-                        break #end 
+                    break #end 
 
                 else:
                     print(f"Was unable to connect to {deviceName}")
@@ -333,7 +338,7 @@ class BLE:
         return (timeStamp, jsons)
 
 server = SSL()
-ble = BLE(["Sensor1", "Sensor3"])
+ble = BLE(["Device1", "Device2", "Device3"])
 cache = Cache()
 
 while True:
