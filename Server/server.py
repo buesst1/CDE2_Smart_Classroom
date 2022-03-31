@@ -133,8 +133,222 @@ class SSL:
         return jsons
 
 class Database:
-    def __init__(self) -> None:
-        pass
+    def __init__(self, userName='SENSOR_DATALAKE2', password='smarTclassrooM2Da') -> None:
+        self.__userName = userName
+        self.__password = password
+
+    def __post(self, 
+        timeStamp:datetime, 
+        device1humidity:float=None, device1co2:float=None, device1temp:float=None, device1light:float=None,
+        device2humidity:float=None, device2co2:float=None, device2temp:float=None, device2light:float=None,
+        device3humidity:float=None, device3co2:float=None, device3temp:float=None, device3light:float=None,
+        device3window1a:bool=None, device3window2b:bool=None, device3window3a:bool=None, device3window4b:bool=None, device3window5a:bool=None,
+    )-> bool:
+        """
+        This method send data to server backend 
+        
+        returns:
+        successful -> true
+        successful -> false
+        """
+    
+        def convert_nullable_float(value):
+            if value == None:
+                return "null"
+
+            return str(value)
+
+        def convert_nullable_bool(value):
+            if value == None:
+                return "null"
+
+            if (value == True):
+                return "1"
+
+            elif(value == False):
+                return "0"
+
+        data_dict = {
+            "inserttime": timeStamp.strftime("%d-%b-%Y %H:%M:%S %p"),
+            "device1humidity": convert_nullable_float(device1humidity),
+            "device1co2": convert_nullable_float(device1co2),
+            "device1temp": convert_nullable_float(device1temp),
+            "device2humidity": convert_nullable_float(device2humidity),
+            "device2co2": convert_nullable_float(device2co2),
+            "device2temp": convert_nullable_float(device2temp),
+            "device3humidity": convert_nullable_float(device3humidity),
+            "device3co2": convert_nullable_float(device3co2),
+            "device3temp": convert_nullable_float(device3temp),
+            "device3window1a": convert_nullable_bool(device3window1a),
+            "device3window2b": convert_nullable_bool(device3window2b),
+            "device3window3a": convert_nullable_bool(device3window3a),
+            "device3window4b": convert_nullable_bool(device3window4b),
+            "device3window5a": convert_nullable_bool(device3window5a),
+            "device1light": convert_nullable_float(device1light),
+            "device2light": convert_nullable_float(device2light),
+            "device3light": convert_nullable_float(device3light)
+        }
+
+        r = requests.post('https://glusfqycvwrucp9-db202202211424.adb.eu-zurich-1.oraclecloudapps.com/ords/sensor_datalake2/sens/any_sensor_data_entry/',auth=(self.__userName, self.__password), data=data_dict)
+
+        if r.raise_for_status() == None:
+            return True
+
+        return True
+
+    def Send_single_measurement(self, measurement:json):
+        """
+        This method tries to send a single measurement
+        """
+        try:
+            inserttime = None
+            device1humidity = None
+            device1co2 = None
+            device1temp = None
+            device2humidity = None
+            device2co2 = None
+            device2temp = None
+            device3humidity = None
+            device3co2 = None
+            device3temp = None
+            device3window1a = None
+            device3window2b = None
+            device3window3a = None
+            device3window4b = None
+            device3window5a = None
+            device1light = None
+            device2light = None
+            device3light = None
+
+            data:json = measurement["data"]
+
+            inserttime = datetime.strptime(measurement["timeStamp"], "%d/%m/%Y %H:%M:%S")
+
+            for deviceName in list(data.keys()):
+
+                deviceData = data[deviceName]
+
+                if deviceData != Error.BleFailure:
+
+                    for sensorName in list(deviceData.keys()):
+                        sensorData = deviceData[sensorName]
+
+                        if sensorData != Error.PhysicalConnectionerror:
+
+                            for measurementName in list(sensorData.keys()):
+                                measurementData = sensorData[measurementName]
+
+                                #skip battery voltage
+                                if measurementName == "bat_voltage":
+                                    continue
+
+                                if measurementData != Error.ReadFailure:
+
+                                    #assign data to variable
+                                    if deviceName == "Device1":
+                                        if sensorName == "scd_30_sensor":
+                                            if measurementName == "SCD_30_CO2":
+                                                device1co2 = float(measurementData)
+
+                                            elif measurementName == "SCD_30_HUM":
+                                                device1humidity = float(measurementData)
+
+                                            elif measurementName == "SCD_30_TEMP":
+                                                device1temp = float(measurementData)
+
+                                            else:
+                                                print(f"Unknown measurementName name fom device: {deviceName} form sensor: {sensorName} received: {measurementName}")
+
+                                        elif sensorName == "light_sensor":
+                                            if measurementName == "LS_lightStrength":
+                                                device1light = float(measurementData)
+
+                                            else:
+                                                print(f"Unknown measurementName name fom device: {deviceName} form sensor: {sensorName} received: {measurementName}")
+                                            
+                                        else:
+                                            print(f"Unknown sensorName name fom device: {deviceName} received: {sensorName}")
+
+                                    elif deviceName == "Device2":
+                                        if sensorName == "scd_30_sensor":
+                                            if measurementName == "SCD_30_CO2":
+                                                device2co2 = float(measurementData)
+
+                                            elif measurementName == "SCD_30_HUM":
+                                                device2humidity = float(measurementData)
+
+                                            elif measurementName == "SCD_30_TEMP":
+                                                device2temp = float(measurementData)
+
+                                            else:
+                                                print(f"Unknown measurementName name fom device: {deviceName} form sensor: {sensorName} received: {measurementName}")
+
+                                        elif sensorName == "light_sensor":
+                                            if measurementName == "LS_lightStrength":
+                                                device2light = float(measurementData)
+
+                                            else:
+                                                print(f"Unknown measurementName name fom device: {deviceName} form sensor: {sensorName} received: {measurementName}")
+                                            
+                                        else:
+                                            print(f"Unknown sensorName name fom device: {deviceName} received: {sensorName}")
+
+                                    elif deviceName == "Device3":
+                                        if sensorName == "scd_30_sensor":
+                                            if measurementName == "SCD_30_CO2":
+                                                device3co2 = float(measurementData)
+
+                                            elif measurementName == "SCD_30_HUM":
+                                                device3humidity = float(measurementData)
+
+                                            elif measurementName == "SCD_30_TEMP":
+                                                device3temp = float(measurementData)
+
+                                            else:
+                                                print(f"Unknown measurementName name fom device: {deviceName} form sensor: {sensorName} received: {measurementName}")
+
+                                        elif sensorName == "light_sensor":
+                                            if measurementName == "LS_lightStrength":
+                                                device3light = float(measurementData)
+
+                                            else:
+                                                print(f"Unknown measurementName name fom device: {deviceName} form sensor: {sensorName} received: {measurementName}")
+
+                                        elif sensorName == "magnetic_sensors":
+                                            if measurementName == "MS_S1":
+                                                device3window1a = bool(measurementData)
+
+                                            elif measurementName == "MS_S2":
+                                                device3window2b = bool(measurementData)
+
+                                            elif measurementName == "MS_S3":
+                                                device3window3a = bool(measurementData)
+
+                                            elif measurementName == "MS_S4":
+                                                device3window4b = bool(measurementData)
+
+                                            elif measurementName == "MS_S5":
+                                                device3window5a = bool(measurementData)
+
+                                            else:
+                                                print(f"Unknown measurementName name fom device: {deviceName} form sensor: {sensorName} received: {measurementName}")
+                                            
+                                        else:
+                                            print(f"Unknown sensorName name fom device: {deviceName} received: {sensorName}")
+
+                                    else:
+                                        print(f"Unknown device name received: {deviceName}")
+
+            return self.__post(
+                                inserttime, device1humidity, device1co2, device1temp, device2humidity, 
+                                device2co2, device2temp, device3humidity, device3co2, device3temp, 
+                                device3window1a, device3window2b, device3window3a, device3window4b, 
+                                device3window5a, device1light, device2light, device3light
+                            )
+
+        except Exception as ex:
+            print(f"Exception occured during sensing data to database: {ex}")
+            return False
 
 class Email:
     def __init__(self, userName:str, password:str, receipents:list) -> None:
@@ -184,7 +398,14 @@ class Email:
         This method sends an email containing the message of a master timeout
         """
         
-        self.Send_Email(self.__receipents, "Statusmeldung: Master Timeout", "Vom Master wurde eine längere Zeit keine Daten mehr empfangen...")
+        self.Send_Email(self.__receipents, "Statusmeldung: Master Info", "Vom Master wurde eine längere Zeit keine Daten mehr empfangen...")
+
+    def Send_MasterReconnect_email(self):
+        """
+        This method sends an email containing the message of a master reconnect
+        """
+        
+        self.Send_Email(self.__receipents, "Statusmeldung: Master Info", "Verbindung zum Master wurde wieder hergestellt")
 
 class ErrorCheck:
     def __init__(self, bat_voltage_lowError_threshold:float = 3.5) -> None:
@@ -267,102 +488,23 @@ class ErrorCheck:
 
         return error_traces_copy
 
-class DataBase:
-    def __init__(self, userName='SENSOR_DATALAKE2', password='smarTclassrooM2Da') -> None:
-        self.__userName = userName
-        self.__password = password
-
-    def __post(self, co2a1=None, co2a2=None, co2a3=None, co2b1=None, co2b2=None, co2b3=None, co2c1=None, co2c2=None, co2c3=None, fenstera1=None, fenstera2=None, fenstera3=None, fensterb1=None, fensterb2=None, licht1=None, licht2=None):
-        def data_to_string(data):
-            if data != None:
-                return str(data)
-
-            return "null"
-        
-        data_dict = {
-                        "co2a1":data_to_string(co2a1),
-                        "co2a2":data_to_string(co2a2),
-                        "co2a3":data_to_string(co2a3),
-                        "co2b1":data_to_string(co2b1),
-                        "co2b2":data_to_string(co2b2),
-                        "co2b3":data_to_string(co2b3),
-                        "co2c1":data_to_string(co2c1),
-                        "co2c2":data_to_string(co2c2),
-                        "co2c3":data_to_string(co2c3),
-                        "fenstera1":data_to_string(fenstera1),
-                        "fenstera2":data_to_string(fenstera2),
-                        "fenstera3":data_to_string(fenstera3),
-                        "fensterb1":data_to_string(fensterb1),
-                        "fensterb2":data_to_string(fensterb2),
-                        "licht1":data_to_string(licht1),
-                        "licht2":data_to_string(licht2)
-                    }
-
-        r = requests.post('https://glusfqycvwrucp9-db202202211424.adb.eu-zurich-1.oraclecloudapps.com/ords/sensor_datalake2/sens/any_sensor_data_entry/',auth=(self.__userName, self.__password), data=data_dict)
-
-        #success
-        if r.status_code == 200:
-            return True
-        
-        #failed
-        return False
-        
-    def __send_single_measurement(measurement:json):
-        co2a1=None, 
-        co2a2=None, 
-        co2a3=None, 
-        co2b1=None, 
-        co2b2=None, 
-        co2b3=None, 
-        co2c1=None, 
-        co2c2=None, 
-        co2c3=None, 
-        fenstera1=None, 
-        fenstera2=None, 
-        fenstera3=None, 
-        fensterb1=None, 
-        fensterb2=None, 
-        licht1=None, 
-        licht2=None
-
-        data:json = measurement["data"]
-
-        time = datetime.strptime(measurement["timeStamp"], "%d/%m/%Y %H:%M:%S")
-
-        for deviceName in list(data.keys()):
-
-            deviceData = data[deviceName]
-
-            if deviceData != Error.BleFailure:
-
-                for sensorName in list(deviceData.keys()):
-                    sensorData = deviceData[sensorName]
-
-                    if sensorData != Error.PhysicalConnectionerror:
-
-                        for measurementName in list(sensorData.keys()):
-                            measurementData = sensorData[measurementName]
-
-                            if measurementData != Error.ReadFailure:
-                                measurementData
-
-
 if __name__ == '__main__':    
     #instances
     server = SSL()
     checkError = ErrorCheck()
+    db = Database()
 
     with open(os.path.dirname(__file__) + "/creditals", "r") as fd:
         creditals = fd.read().split("\n")
     email = Email(creditals[0], creditals[1], ["tobias.buess2001@gmail.com"]) #, "pjluca48@gmail.com"
 
     #constants
-    status_mail_intervall_min = 1 #sends a status email in a specific intervall
-    master_timeout_min = 1 #triggers an email with a masterTimeout message
+    status_mail_intervall_min = 60 #sends a status email in a specific intervall
+    master_timeout_min = 10 #triggers an email with a masterTimeout message
 
     #variables
     time_last_jsons_received = monotonic()
-    master_timeout_mail_sent = False
+    master_timeout_recognized = False
     measurements_database_failed = [] #failed measurements stored here
     
     print("Start mainLoop")
@@ -373,19 +515,29 @@ if __name__ == '__main__':
             if len(measurements_database_failed) > 0:
                 measurement = measurements_database_failed.pop()
 
-                #update measurement 
+                #try update database (otherwise store again)
+                if not db.Send_single_measurement(measurement):
+                    measurements_database_failed.append(measurement)
+                
 
             jsons = server.Get_jsonBuffer()
 
             #as soon as jsons received
             if(len(jsons) > 0):
                 time_last_jsons_received = monotonic()
-                master_timeout_mail_sent = False #reset flag
 
-                #update database
-                print(jsons)
+                #master timeout triggered
+                if master_timeout_recognized:
+                    master_timeout_recognized = False #reset flag
+                    email.Send_MasterReconnect_email()
+                
+                #try store measurements in database
+                for measurement in jsons:
+                    #try update database (otherwise store again)
+                    if not db.Send_single_measurement(measurement):
+                        measurements_database_failed.append(measurement)
 
-                checkError.CheckJsons_StoreErrors(jsons) #check for errors
+                checkError.CheckJsons_StoreErrors(jsons) #check for errors and store it when error occured
 
             #as soon as intervall reached
             if monotonic() >= old_status_mail_time + (status_mail_intervall_min * 60):
@@ -394,8 +546,8 @@ if __name__ == '__main__':
                 email.Send_Status_email(checkError.GetErrors())
 
             #if master timeout occures
-            if (monotonic() >= time_last_jsons_received + (master_timeout_min * 60)) and not master_timeout_mail_sent:
-                master_timeout_mail_sent = True #set flag
+            if (monotonic() >= time_last_jsons_received + (master_timeout_min * 60)) and not master_timeout_recognized:
+                master_timeout_recognized = True #set flag
                 email.Send_MasterTimeout_email()
 
             sleep(1)

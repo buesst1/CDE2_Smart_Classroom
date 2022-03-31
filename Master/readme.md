@@ -11,6 +11,14 @@
 -sudo usermod -a -G bluetooth $USER
 -sudo reboot
 
+->auto login definieren
+-sudo raspi-config
+
+->master script an raspi senden (siehe unten)
+
+->Auto run hinzufügen
+-sudo nano /etc/profile -> an Ende anfügen: 'python /home/pi/master.py &'
+
 #weitere nützliche tools
 ->um dateien über ssh an den rpi zu senden kann folgender command im cmd verwendet werden:
 -pscp source_file_name userid@server_name:/path/destination_file_name -> beispiel: pscp C:\Users\tobia\OneDrive\Dokumente\GitHub\CDE2_Smart_Classroom\Master\master.py pi@raspberrypi.local:/home/pi/master.py
