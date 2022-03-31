@@ -154,13 +154,13 @@ class Database:
     
         def convert_nullable_float(value):
             if value == None:
-                return "null"
+                return None
 
             return str(value)
 
         def convert_nullable_bool(value):
             if value == None:
-                return "null"
+                return None
 
             if (value == True):
                 return 1
@@ -169,7 +169,7 @@ class Database:
                 return 0
 
         data_dict = {
-            "inserttime": timeStamp.strftime("%d-%b-%Y %H:%M:%S %p"),
+            "inserttime": timeStamp.strftime("%d-%b-%Y %I:%M:%S %p"),
             "device1humidity": convert_nullable_float(device1humidity),
             "device1co2": convert_nullable_float(device1co2),
             "device1temp": convert_nullable_float(device1temp),
@@ -188,13 +188,13 @@ class Database:
             "device2light": convert_nullable_float(device2light),
             "device3light": convert_nullable_float(device3light)
         }
-        
-        r = requests.post('https://glusfqycvwrucp9-db202202211424.adb.eu-zurich-1.oraclecloudapps.com/ords/sensor_datalake2/sens/any_sensor_data_entry/',auth=(self.__userName, self.__password), data=json.dumps(data_dict))
 
-        if r.raise_for_status() == None:
+        r = requests.post('https://glusfqycvwrucp9-db202202211424.adb.eu-zurich-1.oraclecloudapps.com/ords/sensor_datalake2/sens/any_sensor_data_entry/',auth=(self.__userName, self.__password), data=json.loads(json.dumps(data_dict)))
+
+        if r.ok:
             return True
 
-        return True
+        return False
 
     def Send_single_measurement(self, measurement:json):
         """
