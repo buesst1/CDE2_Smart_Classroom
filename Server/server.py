@@ -528,6 +528,8 @@ if __name__ == '__main__':
             if(len(jsons) > 0):
                 time_last_jsons_received = monotonic()
 
+                print(jsons)
+
                 #master timeout triggered
                 if master_timeout_recognized:
                     master_timeout_recognized = False #reset flag

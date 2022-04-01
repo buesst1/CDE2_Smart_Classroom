@@ -133,34 +133,29 @@ class SCD30_Sensor:
         return self.__temp_celcius
 
 class Light_Sensor:
-    def __init__(self, pin=board.A2, m=-1.353984, q=2.407590):
+    def __init__(self, pin=board.A2):
         """
         m,q calculated with diagram from SEN-09088.pdf
         """
 
         self.__analogRead = AnalogIn(pin)
 
-        self.__m = m
-        self.__q = q
+        self.__m = 0.0002395 / 100 #according to datasheet: typ 239.5 uA at 100lux
+        self.__q = 0 #according to datasheet: 0lux -> max 10nA
 
-    def __Read_Resistance_Ohms(self):
+    def __Read_Current_Ampere(self, R1_res_ohms=68000):
         ref_voltage = self.__analogRead.reference_voltage
         voltage_R1 = (ref_voltage / 65536) * self.__analogRead.value #calculate voltage on pin
-        voltage_Sensor = ref_voltage - voltage_R1
 
-        current = voltage_R1 / 68000 #calculate current through sensor (voltage over R1 / R1 (68kOhm))
+        current_R1 = voltage_R1 / R1_res_ohms #calculate current through sensor (voltage over R1 / R1 (68kOhm))
 
-        R_Sensor = voltage_Sensor / current #calcualte resistance of sensor
-
-        return R_Sensor
+        return current_R1
 
     def Get_Light_Strength_Lux(self):
         try:
-            log_resistance = math.log(self.__Read_Resistance_Ohms(), 10)
-
-            log_lux = self.__m*log_resistance + self.__q
-
-            return 10**log_lux
+            current_A = self.__Read_Current_Ampere()
+        
+            return self.__m * current_A + self.__q
 
         except Exception as ex:
             print(ex)

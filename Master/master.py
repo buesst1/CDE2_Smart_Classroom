@@ -311,13 +311,20 @@ class BLE:
 
             number_of_tries = 0
             while number_of_tries < max_number_of_tries:
+                print(f"Try connect to  {deviceName}")
 
                 connection = self.__TryConnect_ToDevice(ad)
 
                 if (connection != None):
+                    print(f"Successfully connected to {deviceName} -> start reading")
+
                     answer = self.__Request_Measurements_from_connection(connection)
 
+                    print(f"Finished reading from {deviceName} -> disconnect")
+
                     self.__Disconnect_FromDevice_Save(connection) #disconnect if a connection was opened
+
+                    print(f"Disconnected from {deviceName}")
 
                     #getting data was successful
                     if answer != None:
