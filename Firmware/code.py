@@ -140,7 +140,7 @@ class Light_Sensor:
 
         self.__analogRead = AnalogIn(pin)
 
-        self.__m = 0.0002395 / 100 #according to datasheet: typ 239.5 uA at 100lux
+        self.__m = 100 / 0.0002395 #according to datasheet: typ 239.5 uA at 100lux
         self.__q = 0 #according to datasheet: 0lux -> max 10nA
 
     def __Read_Current_Ampere(self, R1_res_ohms=68000):
