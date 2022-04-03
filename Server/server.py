@@ -41,13 +41,13 @@ class SSL:
                 bindsocket.listen(5)
 
                 while True:
-                    print("listening")
-                    newsocket, fromaddr = bindsocket.accept()
-                    print("accepted")
-
-                    connstream = context.wrap_socket(newsocket, server_side=True)
-
                     try:
+                        print("listening")
+                        newsocket, fromaddr = bindsocket.accept()
+                        print("accepted")
+
+                        connstream = context.wrap_socket(newsocket, server_side=True)
+
                         self.__handle_client(connstream)
 
                     except Exception as ex:
