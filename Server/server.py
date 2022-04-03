@@ -499,7 +499,7 @@ if __name__ == '__main__':
 
     with open(os.path.dirname(__file__) + "/creditals", "r") as fd:
         creditals = fd.read().split("\n")
-    email = Email(creditals[0], creditals[1], ["tobias.buess2001@gmail.com"]) #, "pjluca48@gmail.com"
+    email = Email(creditals[0], creditals[1], ["tobias.buess2001@gmail.com", "pjluca48@gmail.com", "yannic.lais@students.fhnw.ch"])
 
     #constants
     status_mail_intervall_min = 60 #sends a status email in a specific intervall
