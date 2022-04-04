@@ -48,14 +48,20 @@ class SSL:
 
                         connstream = context.wrap_socket(newsocket, server_side=True)
 
+                        connstream.settimeout(5) #set read/write timeout to 5 seconds
+
                         self.__handle_client(connstream)
 
                     except Exception as ex:
                         print(f"Exception occured during accepting client: {ex}")
 
                     finally:
-                        connstream.shutdown(socket.SHUT_RDWR)
-                        connstream.close()
+                        #close connection
+                        try:
+                            connstream.shutdown(socket.SHUT_RDWR)
+                            connstream.close()
+                        except:
+                            pass
 
                         print("connection closed")
                     
@@ -67,24 +73,31 @@ class SSL:
         try:
             message = "" #message stored here
 
-            #wait until bytes arrived
-            data = None
-            while not data:
-                data = conn.recv(buflen=1)
+            try:
+                #wait until bytes arrived
+                data = None
+                while not data:
+                    data = conn.recv(buflen=1)
 
-            while data:
-                if data != b"\n":
-                    message += bytes.decode(data) 
-                else:
-                    break
+                while data:
+                    if data != b"\n":
+                        message += bytes.decode(data) 
+                    else:
+                        break
 
-                data = conn.recv(1)
+                    data = conn.recv(1)
 
+            except Exception as ex:
+                print(f"Error occured during reading data from master: {ex}")
+
+                conn.sendall(str.encode("failed\n"))
+
+                return
+            
             splitted_msg = message.split("~")
 
             if len(splitted_msg) != 2:
                 conn.sendall(str.encode("failed\n"))
-
                 raise Exception("message has incorrect length")
 
             if splitted_msg[0] == "data":

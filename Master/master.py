@@ -22,31 +22,49 @@ class SSL:
         bindsocket = socket.create_connection((self.HOST, self.PORT), timeout=5)
         conn = context.wrap_socket(bindsocket, server_hostname=self.HOST)
 
-        message_bytes = str.encode(message + "\n") #convert to bytes
-        
-        conn.sendall(message_bytes)
+        conn.settimeout(5) #set read/write timeout to 5 seconds
 
-        #read message
-        message = "" #message stored here
+        message = "" #answer from server stored here
+        returnNone = False #true if error occured and None should be returned
 
-        #wait until bytes arrived
-        data = None
-        while not data:
-            data = conn.recv(buflen=1)
+        #send data to server and expect answer
+        try:
+            message_bytes = str.encode(message + "\n") #convert to bytes
+            conn.sendall(message_bytes)
 
-        while data:
-            if data != b"\n":
-                message += bytes.decode(data) 
-            else:
-                break
+            try:
+                #wait until bytes arrived
+                data = None
+                while not data:
+                    data = conn.recv(buflen=1)
 
-            data = conn.recv(1)
+                while data:
+                    if data != b"\n":
+                        message += bytes.decode(data) 
+                    else:
+                        break
 
+                    data = conn.recv(1)
 
-        conn.shutdown(socket.SHUT_RDWR)
-        conn.close()
+            except Exception as ex:
+                returnNone = True #set flag
+                print(f"Exception occured during receiving answer from server: {ex}")
 
-        return message
+        except Exception as ex:
+            returnNone = True #set flag
+            print(f"Exception occured during sending data to server: {ex}")
+
+        #close connection
+        try:
+            conn.shutdown(socket.SHUT_RDWR)
+            conn.close()
+        except:
+            pass
+            
+        if not returnNone:
+            return message
+
+        return None
 
     def __Write(self, message: str) -> bool:
         try:
@@ -349,33 +367,37 @@ ble = BLE(["Device1", "Device2", "Device3"])
 cache = Cache()
 
 while True:
-    #wait 10s
-    timestamp = monotonic()
-    while (monotonic() - timestamp) < 30:
-        sleep(1)
+    try:
+        #wait 10s
+        timestamp = monotonic()
+        while (monotonic() - timestamp) < 30:
+            sleep(1)
 
-    #start measurement
-    all_jsons = [] #all measurements are stored here
+        #start measurement
+        all_jsons = [] #all measurements are stored here
 
-    #start a ble request
-    start_Time, jsons = ble.Start_Request()
-    new_measurement = json.dumps({"timeStamp":start_Time.strftime("%d/%m/%Y %H:%M:%S"), "data":jsons})  
+        #start a ble request
+        start_Time, jsons = ble.Start_Request()
+        new_measurement = json.dumps({"timeStamp":start_Time.strftime("%d/%m/%Y %H:%M:%S"), "data":jsons})  
 
-    #read cached jsons
-    cached_jsons = cache.Cache_Read() 
+        #read cached jsons
+        cached_jsons = cache.Cache_Read() 
 
-    #append jsons
-    all_jsons.append(new_measurement) 
+        #append jsons
+        all_jsons.append(new_measurement) 
 
-    if cached_jsons != None:
-        all_jsons.extend(cached_jsons)
-    
-    #if jsons sent successfully
-    if server.Send_Jsons(all_jsons):
-        if not cache.Cache_Clear():#clear cache
-            raise Exception("cache could not be cleared")
+        if cached_jsons != None:
+            all_jsons.extend(cached_jsons)
+        
+        #if jsons sent successfully
+        if server.Send_Jsons(all_jsons):
+            if not cache.Cache_Clear():#clear cache
+                raise Exception("cache could not be cleared")
 
-    else:
-        print("Data Cached")
-        if not cache.Cache_Append_Json(new_measurement):
-            raise Exception("cache could not be extended")
+        else:
+            print("Data Cached")
+            if not cache.Cache_Append_Json(new_measurement):
+                raise Exception("cache could not be extended")
+
+    except Exception as ex:
+        print(f"Exception occured in MainLoop: {ex}")
