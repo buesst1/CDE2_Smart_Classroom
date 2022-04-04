@@ -17,63 +17,76 @@ class SSL:
         self.PORT = port
 
     def __Send_Read(self, message:str) -> str:
-        context = ssl._create_unverified_context()
-
-        bindsocket = socket.create_connection((self.HOST, self.PORT), timeout=5)
-        conn = context.wrap_socket(bindsocket, server_hostname=self.HOST)
-
-        conn.settimeout(5) #set read/write timeout to 5 seconds
+        """
+        Sends message and reives answer -> if a failure occures: None is returned
+        """
 
         message = "" #answer from server stored here
         returnNone = False #true if error occured and None should be returned
 
-        #send data to server and expect answer
         try:
-            message_bytes = str.encode(message + "\n") #convert to bytes
-            conn.sendall(message_bytes)
+            context = ssl._create_unverified_context()
 
+            bindsocket = socket.create_connection((self.HOST, self.PORT), timeout=5)
+            conn = context.wrap_socket(bindsocket, server_hostname=self.HOST)
+
+            conn.settimeout(5) #set read/write timeout to 5 seconds
+
+            #send data to server and expect answer
             try:
-                #wait until bytes arrived
-                data = None
-                while not data:
-                    data = conn.recv(buflen=1)
+                message_bytes = str.encode(message + "\n") #convert to bytes
+                conn.sendall(message_bytes)
 
-                while data:
-                    if data != b"\n":
-                        message += bytes.decode(data) 
-                    else:
-                        break
+                try:
+                    #wait until bytes arrived
+                    data = None
+                    while not data:
+                        data = conn.recv(buflen=1)
 
-                    data = conn.recv(1)
+                    while data:
+                        if data != b"\n":
+                            message += bytes.decode(data) 
+                        else:
+                            break
+
+                        data = conn.recv(1)
+
+                except Exception as ex:
+                    returnNone = True #set flag
+                    print(f"Exception occured during receiving answer from server: {ex}")
 
             except Exception as ex:
                 returnNone = True #set flag
-                print(f"Exception occured during receiving answer from server: {ex}")
+                print(f"Exception occured during sending data to server: {ex}")
+
+            #close connection
+            try:
+                conn.shutdown(socket.SHUT_RDWR)
+                conn.close()
+            except:
+                pass
 
         except Exception as ex:
             returnNone = True #set flag
-            print(f"Exception occured during sending data to server: {ex}")
+            print(f"Exception occured druing connecting to server: {ex}")
+               
+        if returnNone: #error occured and None should be returned
+            return None
 
-        #close connection
-        try:
-            conn.shutdown(socket.SHUT_RDWR)
-            conn.close()
-        except:
-            pass
-            
-        if not returnNone:
+        else: #data sent successfully
             return message
-
-        return None
 
     def __Write(self, message: str) -> bool:
         try:
             received = self.__Send_Read(message)
 
-            if received == "confirmed":
+            if received == None: #exception during sending/receiving data
+                return False
+
+            elif received == "confirmed": #server stored data successfully
                 return True
 
-            elif received == "failed":
+            elif received == "failed": #data failed to store
                 return False
 
             else:
