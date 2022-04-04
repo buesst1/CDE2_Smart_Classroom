@@ -29,6 +29,7 @@ class SSL:
 
             bindsocket = socket.create_connection((self.HOST, self.PORT), timeout=5)
             conn = context.wrap_socket(bindsocket, server_hostname=self.HOST)
+            bindsocket.close() #close original socket
 
             conn.settimeout(5) #set read/write timeout to 5 seconds
 
@@ -62,21 +63,27 @@ class SSL:
             #close connection
             try:
                 conn.shutdown(socket.SHUT_RDWR)
-            except:
-                pass
+            except Exception as ex:
+                print(f"Exception occured in shutdown connection: {ex}")
 
+            try:
+                conn.close()
+            except Exception as ex:
+                print(f"Exception occured in close connection: {ex}")
+
+        except Exception as ex:
+            returnNone = True #set flag
+
+            #close eventually open bindsocket
             try:
                 bindsocket.close()
             except:
                 pass
 
-        except Exception as ex:
-            returnNone = True #set flag
-            print(f"Exception occured druing connecting to server: {ex}")
+            print(f"Exception occured during connecting to server: {ex}")
                
         if returnNone: #error occured and None should be returned
             return None
-
         else: #data sent successfully
             return message
 

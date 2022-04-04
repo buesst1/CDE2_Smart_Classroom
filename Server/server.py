@@ -43,34 +43,43 @@ class SSL:
                 while True:
                     try:
                         print("listening")
-                        newsocket, fromaddr = bindsocket.accept()
-                        print("accepted")
-
+                        newsocket, fromaddr = bindsocket.accept() #wait for incoming connection
                         connstream = context.wrap_socket(newsocket, server_side=True)
+                        newsocket.close() #close original socket
+                        print("accepted")
 
                         connstream.settimeout(5) #set read/write timeout to 5 seconds
 
                         self.__handle_client(connstream)
+                        print("Client handled")
 
                     except Exception as ex:
                         print(f"Exception occured during accepting client: {ex}")
 
                     finally:
+
                         #close connection
                         try:
                             connstream.shutdown(socket.SHUT_RDWR)
-                        except:
-                            pass
+                        except Exception as ex:
+                            print(f"Exception occured in shutdown connection: {ex}")
 
                         try:
-                            newsocket.close()
-                        except:
-                            pass
+                            connstream.close()
+                        except Exception as ex:
+                            print(f"Exception occured in close connection: {ex}")
 
                         print("connection closed")
                     
 
             except Exception as ex:
+
+                #close eventually open bindsocket
+                try:
+                    bindsocket.close()
+                except:
+                    pass
+
                 print(f"Critical error in listener thread: {ex}")
 
     def __handle_client(self, conn:ssl.SSLSocket):
