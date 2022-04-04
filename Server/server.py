@@ -34,7 +34,7 @@ class SSL:
         while True:
             try:
                 context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-                context.load_cert_chain(self.__dirname + r'\\SSL\\certificate.crt', self.__dirname + r'\\SSL\\certificate.key')
+                context.load_cert_chain(self.__dirname + r'/SSL/certificate.crt', self.__dirname + r'/SSL/certificate.key')
 
                 bindsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
                 bindsocket.bind((self.HOST, self.PORT))
