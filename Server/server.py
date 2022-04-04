@@ -54,7 +54,7 @@ class SSL:
                         print("Client handled")
 
                     except Exception as ex:
-                        print(f"Exception occured during accepting client: {ex}")
+                        print(f"Exception occured during accepting and handling client: {ex}")
 
                     finally:
 

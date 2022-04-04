@@ -60,16 +60,18 @@ class SSL:
                 returnNone = True #set flag
                 print(f"Exception occured during sending data to server: {ex}")
 
-            #close connection
-            try:
-                conn.shutdown(socket.SHUT_RDWR)
-            except Exception as ex:
-                print(f"Exception occured in shutdown connection: {ex}")
+            finally:
+                
+                #close connection
+                try:
+                    conn.shutdown(socket.SHUT_RDWR)
+                except Exception as ex:
+                    print(f"Exception occured in shutdown connection: {ex}")
 
-            try:
-                conn.close()
-            except Exception as ex:
-                print(f"Exception occured in close connection: {ex}")
+                try:
+                    conn.close()
+                except Exception as ex:
+                    print(f"Exception occured in close connection: {ex}")
 
         except Exception as ex:
             returnNone = True #set flag
