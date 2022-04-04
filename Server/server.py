@@ -59,7 +59,11 @@ class SSL:
                         #close connection
                         try:
                             connstream.shutdown(socket.SHUT_RDWR)
-                            connstream.close()
+                        except:
+                            pass
+
+                        try:
+                            newsocket.close()
                         except:
                             pass
 

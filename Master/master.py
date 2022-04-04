@@ -62,7 +62,11 @@ class SSL:
             #close connection
             try:
                 conn.shutdown(socket.SHUT_RDWR)
-                conn.close()
+            except:
+                pass
+
+            try:
+                bindsocket.close()
             except:
                 pass
 
