@@ -24,11 +24,11 @@ class SSL:
 
         self.__dirname = os.path.dirname(__file__)
 
-        self.__input_jsons = []
+        self.__input_jsons = [] #all jsons received stored here
 
         #start listener thread
         self.__listener_thread = threading.Thread(target=self.__listener, daemon=True)
-        self.__listener_thread.start()     
+        self.__listener_thread.start()    
 
     def __listener(self):
         while True:
@@ -542,7 +542,7 @@ if __name__ == '__main__':
     server = SSL()
     checkError = ErrorCheck()
     db = Database()
-
+    
     with open(os.path.dirname(__file__) + "/creditals", "r") as fd:
         creditals = fd.read().split("\n")
     email = Email(creditals[0], creditals[1], ["tobias.buess2001@gmail.com", "pjluca48@gmail.com", "yannic.lais@students.fhnw.ch"])
@@ -563,6 +563,8 @@ if __name__ == '__main__':
         try:
             if len(measurements_database_failed) > 0:
                 measurement = measurements_database_failed.pop()
+
+                print(f"{len(measurements_database_failed)} jsons buffered and not stored in database")
 
                 #try update database (otherwise store again)
                 if not db.Send_single_measurement(measurement):
