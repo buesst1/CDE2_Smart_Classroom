@@ -8,7 +8,6 @@ import ssl
 import os
 from time import monotonic, sleep
 import smtplib
-from sympy import EX
 import yaml
 import requests
 
@@ -47,15 +46,20 @@ class SSL:
                         print("listening")
                         newsocket, fromaddr = bindsocket.accept() #wait for incoming connection
                         connstream = context.wrap_socket(newsocket, server_side=True)
+                        connstream.settimeout(5) #set read/write timeout to 5 seconds
                         newsocket.close() #close original socket
                         print("accepted")
-
-                        connstream.settimeout(5) #set read/write timeout to 5 seconds
 
                         self.__handle_client(connstream)
                         print("Client handled")
 
                     except Exception as ex:
+                        #close eventual open newsocket
+                        try:
+                            newsocket.close()
+                        except:
+                            pass
+
                         print(f"Exception occured during accepting and handling client: {ex}")
 
                     finally:

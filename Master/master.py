@@ -10,79 +10,108 @@ import adafruit_ble
 import json
 import os
 from iterators import TimeoutIterator
+from matplotlib.pyplot import close
 
 class SSL:
     def __init__(self, host= 'solarbroom.com', port= 443) -> None:
         self.HOST = host
         self.PORT = port
+    
+    def __read_from_conn(self, conn:ssl.SSLSocket):
+        """
+        read message from connection
+        returns: received string 
+        
+        this method can raise an error
+        """
+
+        message = "" #message stored here
+        while True:
+            data = conn.recv(buflen=1024) #read 1024 bytes
+
+            #if no data received
+            if data == b"":
+                raise Exception(f"No data received.\nAlready read data.\n{message}")
+
+            #decode received bytes and store characters in message (check if endchar received)
+            for chr in bytes.decode(data):
+                #if endchar received -> return message
+                if chr == "\n":
+                    return message
+
+                else: #otherwise add char to message
+                    message += chr
 
     def __Send_Read(self, message:str) -> str:
         """
         Sends message and reives answer -> if a failure occures: None is returned
         """
 
-        message = "" #answer from server stored here
-        returnNone = False #true if error occured and None should be returned
-
+        #try creating socket
         try:
-            context = ssl._create_unverified_context()
-
             bindsocket = socket.create_connection((self.HOST, self.PORT), timeout=5)
+            bindsocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+        except Exception as ex:
+            print(f"Exception occured during creating bindingSocket: {ex}")
+
+            return None
+
+        #try create sslcontext
+        try:
+            context = ssl._create_unverified_context()            
             conn = context.wrap_socket(bindsocket, server_hostname=self.HOST)
             bindsocket.close() #close original socket
 
             conn.settimeout(5) #set read/write timeout to 5 seconds
 
-            #send data to server and expect answer
-            try:
-                message_bytes = str.encode(message + "\n") #convert to bytes
-                conn.sendall(message_bytes)
-
-                try:
-                    #wait until bytes arrived
-                    data = None
-                    while not data:
-                        data = conn.recv(buflen=1)
-
-                    while data:
-                        if data != b"\n":
-                            message += bytes.decode(data) 
-                        else:
-                            break
-
-                        data = conn.recv(1)
-
-                except Exception as ex:
-                    returnNone = True #set flag
-                    print(f"Exception occured during receiving answer from server: {ex}")
-
-            except Exception as ex:
-                returnNone = True #set flag
-                print(f"Exception occured during sending data to server: {ex}")
-
-            finally:
-                
-                #close connection
-                try:
-                    conn.shutdown(socket.SHUT_RDWR)
-                except Exception as ex:
-                    print(f"Exception occured in shutdown connection: {ex}")
-
-                try:
-                    conn.close()
-                except Exception as ex:
-                    print(f"Exception occured in close connection: {ex}")
-
         except Exception as ex:
-            returnNone = True #set flag
-
-            #close eventually open bindsocket
+            #close eventual open connections
             try:
                 bindsocket.close()
+                conn.close()
             except:
                 pass
 
-            print(f"Exception occured during connecting to server: {ex}")
+            print(f"Building ssl connection failed: {ex}")    
+            return None
+
+
+
+        ##send receive message##
+
+        message = "" #answer from server stored here
+        returnNone = False #true if error occured and None should be returned
+
+        #send data to server and expect answer
+        try:
+            message_bytes = str.encode(message + "\n") #convert to bytes
+            conn.sendall(message_bytes)
+
+            try:
+                message = self.__read_from_conn(conn)
+
+            except Exception as ex:
+                returnNone = True #set flag
+                print(f"Exception occured during receiving answer from server: {ex}")
+
+        except Exception as ex:
+            returnNone = True #set flag
+            print(f"Exception occured during sending data to server: {ex}")
+
+        finally:
+            
+            #close connection
+            try:
+                conn.shutdown(socket.SHUT_RDWR)
+            except Exception as ex:
+                print(f"Exception occured in shutdown connection: {ex}")
+
+            try:
+                conn.close()
+            except Exception as ex:
+                print(f"Exception occured in close connection: {ex}")
+
                
         if returnNone: #error occured and None should be returned
             return None
