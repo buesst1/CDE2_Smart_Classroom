@@ -8,6 +8,7 @@ import ssl
 import os
 from time import monotonic, sleep
 import smtplib
+from sympy import EX
 import yaml
 import requests
 
@@ -28,7 +29,7 @@ class SSL:
 
         #start listener thread
         self.__listener_thread = threading.Thread(target=self.__listener, daemon=True)
-        self.__listener_thread.start()  
+        self.__listener_thread.start()     
 
     def __listener(self):
         while True:
@@ -37,6 +38,7 @@ class SSL:
                 context.load_cert_chain(self.__dirname + r'/SSL/certificate.crt', self.__dirname + r'/SSL/certificate.key')
 
                 bindsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+                bindsocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 bindsocket.bind((self.HOST, self.PORT))
                 bindsocket.listen(5)
 
@@ -82,23 +84,37 @@ class SSL:
 
                 print(f"Critical error in listener thread: {ex}")
 
+    def __read_from_conn(self, conn:ssl.SSLSocket):
+        """
+        read message from connection
+        returns: received string 
+        
+        this method can raise an error
+        """
+
+        message = "" #message stored here
+        while True:
+            data = conn.recv(buflen=1024) #read 1024 bytes
+
+            #if no data received
+            if data == b"":
+                raise Exception(f"No data received.\nAlready read data.\n{message}")
+
+            #decode received bytes and store characters in message (check if endchar received)
+            for chr in bytes.decode(data):
+                #if endchar received -> return message
+                if chr == "\n":
+                    return message
+
+                else: #otherwise add char to message
+                    message += chr
+
     def __handle_client(self, conn:ssl.SSLSocket):
         try:
             message = "" #message stored here
 
             try:
-                #wait until bytes arrived
-                data = None
-                while not data:
-                    data = conn.recv(buflen=1)
-
-                while data:
-                    if data != b"\n":
-                        message += bytes.decode(data) 
-                    else:
-                        break
-
-                    data = conn.recv(1)
+                message = self.__read_from_conn(conn)
 
             except Exception as ex:
                 print(f"Error occured during reading data from master: {ex}")
