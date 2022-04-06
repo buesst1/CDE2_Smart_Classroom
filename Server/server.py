@@ -131,7 +131,7 @@ class SSL:
 
             if len(splitted_msg) != 2:
                 conn.sendall(str.encode("failed\n"))
-                raise Exception("message has incorrect length")
+                raise Exception(f"message has incorrect length: {message}")
 
             if splitted_msg[0] == "data":
                 if self.__handle__jsons(splitted_msg[1]):
@@ -142,7 +142,7 @@ class SSL:
 
             else:
                 conn.sendall(str.encode("failed\n"))
-                raise Exception("unknown command received")
+                raise Exception("unknown command received: {message}")
 
         except Exception as ex:
             print(f"Exception occured during handling client: {ex}")
