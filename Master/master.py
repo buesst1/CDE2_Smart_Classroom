@@ -10,7 +10,6 @@ import adafruit_ble
 import json
 import os
 from iterators import TimeoutIterator
-from matplotlib.pyplot import close
 
 class SSL:
     def __init__(self, host= 'solarbroom.com', port= 443) -> None:
@@ -52,6 +51,8 @@ class SSL:
             bindsocket = socket.create_connection((self.HOST, self.PORT), timeout=5)
             bindsocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
+            print("BindingSocket successfully created")
+
         except Exception as ex:
             #close eventual open bindsocket
             try:
@@ -70,6 +71,8 @@ class SSL:
 
             conn.settimeout(5) #set read/write timeout to 5 seconds
 
+            print("SSLSocket successfully created")
+
         except Exception as ex:
             #close eventual open bindsocket
             try:
@@ -87,19 +90,25 @@ class SSL:
             return None
 
 
-
         ##send receive message##
 
-        message = "" #answer from server stored here
+        answer = "" #answer from server stored here
         returnNone = False #true if error occured and None should be returned
 
         #send data to server and expect answer
         try:
             message_bytes = str.encode(message + "\n") #convert to bytes
+
+            print(f"Sending message: {message_bytes}")
+
             conn.sendall(message_bytes)
 
+            print("Message Sent")
+
             try:
-                message = self.__read_from_conn(conn)
+                answer = self.__read_from_conn(conn)
+
+                print(f"Answer received: {answer}")
 
             except Exception as ex:
                 returnNone = True #set flag
@@ -126,7 +135,7 @@ class SSL:
         if returnNone: #error occured and None should be returned
             return None
         else: #data sent successfully
-            return message
+            return answer
 
     def __Write(self, message: str) -> bool:
         try:

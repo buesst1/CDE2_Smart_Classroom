@@ -115,10 +115,10 @@ class SSL:
 
     def __handle_client(self, conn:ssl.SSLSocket):
         try:
-            message = "" #message stored here
+            answer = "" #message stored here
 
             try:
-                message = self.__read_from_conn(conn)
+                answer = self.__read_from_conn(conn)
 
             except Exception as ex:
                 print(f"Error occured during reading data from master: {ex}")
@@ -127,11 +127,11 @@ class SSL:
 
                 return
             
-            splitted_msg = message.split("~")
+            splitted_msg = answer.split("~")
 
             if len(splitted_msg) != 2:
                 conn.sendall(str.encode("failed\n"))
-                raise Exception(f"message has incorrect length: {message}")
+                raise Exception(f"message has incorrect length: {answer}")
 
             if splitted_msg[0] == "data":
                 if self.__handle__jsons(splitted_msg[1]):
@@ -142,7 +142,7 @@ class SSL:
 
             else:
                 conn.sendall(str.encode("failed\n"))
-                raise Exception("unknown command received: {message}")
+                raise Exception("unknown command received: {answer}")
 
         except Exception as ex:
             print(f"Exception occured during handling client: {ex}")
