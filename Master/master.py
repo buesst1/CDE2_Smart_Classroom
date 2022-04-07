@@ -53,8 +53,13 @@ class SSL:
             bindsocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
         except Exception as ex:
-            print(f"Exception occured during creating bindingSocket: {ex}")
+            #close eventual open bindsocket
+            try:
+                bindsocket.close()
+            except:
+                pass
 
+            print(f"Exception occured during creating bindingSocket: {ex}")
             return None
 
         #try create sslcontext
@@ -66,9 +71,14 @@ class SSL:
             conn.settimeout(5) #set read/write timeout to 5 seconds
 
         except Exception as ex:
-            #close eventual open connections
+            #close eventual open bindsocket
             try:
                 bindsocket.close()
+            except:
+                pass
+
+            #close eventual open sslsocket
+            try:
                 conn.close()
             except:
                 pass
