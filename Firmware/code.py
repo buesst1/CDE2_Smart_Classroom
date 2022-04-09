@@ -38,15 +38,6 @@ class blueTooth:
 
         self.__ble.stop_advertising() #stop advertising
 
-    def Wait_For_Connection_Sync(self):
-        """
-        This method will wait until a client has connected
-        """
-
-        #wait for connection
-        while not self.__ble.connected:
-            continue
-
     def Is_Connected(self):
         return self.__ble.connected
 
