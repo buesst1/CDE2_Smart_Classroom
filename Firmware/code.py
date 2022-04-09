@@ -154,7 +154,7 @@ class Light_Sensor:
             print(ex)
         
 class Battery_Voltage:
-    def __init__(self, pin: board = board.A0, voltage_divider_ratio = 0.5):
+    def __init__(self, pin: board = board.BATTERY, voltage_divider_ratio = 0.5):
         self.__analogRead = AnalogIn(pin)
         self.__divider_ratio = voltage_divider_ratio
         self.__ref_voltage = self.__analogRead.reference_voltage
