@@ -270,7 +270,6 @@ class Manager:
 
                 try:
                     measurements["SCD_30_CO2"] = self.__scd_30_sensor.Read_CO2_PPM()
-                    #raise Exception("test")
                 except:
                     measurements["SCD_30_CO2"] = Error.ReadFailure
 

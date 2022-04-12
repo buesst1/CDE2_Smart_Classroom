@@ -131,11 +131,14 @@ class SSL:
 
                 return
             
-            splitted_msg = answer.split("~")
+            try:
 
-            if len(splitted_msg) != 2:
+                splitted_msg = answer.split("~")
+                
+            except:
                 conn.sendall(str.encode("failed\n"))
-                raise Exception(f"message has incorrect length: {answer}")
+                
+                return
 
             if splitted_msg[0] == "data":
                 if self.__handle__jsons(splitted_msg[1]):
@@ -563,7 +566,6 @@ if __name__ == '__main__':
     print("Start mainLoop")
     old_status_mail_time = monotonic()
     while True:
-
         try:
             if len(measurements_database_failed) > 0:
                 measurement = measurements_database_failed.pop()

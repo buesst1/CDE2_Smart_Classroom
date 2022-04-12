@@ -281,7 +281,7 @@ class BLE:
         try:
             print("scanning")
             found_addr = set()
-            it = TimeoutIterator(self.__ble.start_scan(ProvideServicesAdvertisement, timeout=timeout_s), timeout_s + 2) #TimeoutIterator used because of: self.__ble.start_scan does not yield anything if nothign is found 
+            it = TimeoutIterator(self.__ble.start_scan(ProvideServicesAdvertisement, timeout=timeout_s), timeout_s + 5) #TimeoutIterator used because of: self.__ble.start_scan does not yield anything if nothign is found 
             for advertisement in it: 
                 
                 #timeout received
@@ -367,10 +367,14 @@ class BLE:
 
             message = ""
             while True:
-                #wait until bytes arrived
+                #wait until bytes arrived -> raise exception if no data arrived for too long
+                time_ = monotonic()
                 while uart.in_waiting < 1:
                     if not connection.connected:
                         raise Exception("connection lost")
+
+                    if monotonic() - time_ >= start_read_timeout_s:
+                        raise Exception("connection timed out")
 
                 byte_:bytes = uart.read(1)
 
@@ -442,7 +446,7 @@ cache = Cache()
 
 while True:
     try:
-        #wait 10s
+        #wait 30s
         timestamp = monotonic()
         while (monotonic() - timestamp) < 30:
             sleep(1)
