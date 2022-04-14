@@ -192,9 +192,9 @@ class Database:
 
     def __post(self, 
         timeStamp:datetime, 
-        device1humidity:float=None, device1co2:float=None, device1temp:float=None, device1light:float=None,
-        device2humidity:float=None, device2co2:float=None, device2temp:float=None, device2light:float=None,
-        device3humidity:float=None, device3co2:float=None, device3temp:float=None, device3light:float=None,
+        device1humidity:float=None, device1co2:float=None, device1temp:float=None, device1light:float=None, device1battery:float=None,
+        device2humidity:float=None, device2co2:float=None, device2temp:float=None, device2light:float=None, device2battery:float=None,
+        device3humidity:float=None, device3co2:float=None, device3temp:float=None, device3light:float=None, device3battery:float=None,
         device3window1a:bool=None, device3window2b:bool=None, device3window3a:bool=None, device3window4b:bool=None, device3window5a:bool=None,
     )-> bool:
         """
@@ -239,7 +239,10 @@ class Database:
             "device3window5a": convert_nullable_bool(device3window5a),
             "device1light": convert_nullable_float(device1light),
             "device2light": convert_nullable_float(device2light),
-            "device3light": convert_nullable_float(device3light)
+            "device3light": convert_nullable_float(device3light),
+            "device1battery": convert_nullable_float(device1battery),
+            "device2battery": convert_nullable_float(device2battery),
+            "device3battery": convert_nullable_float(device3battery),
         }
 
         r = requests.post('https://glusfqycvwrucp9-db202202211424.adb.eu-zurich-1.oraclecloudapps.com/ords/sensor_datalake2/sens/any_sensor_data_entry/',auth=(self.__userName, self.__password), data=json.loads(json.dumps(data_dict)))
@@ -272,6 +275,9 @@ class Database:
             device1light = None
             device2light = None
             device3light = None
+            device1battery = None
+            device2battery = None
+            device3battery = None
 
             measurement_json = json.loads(measurement)
 
@@ -321,6 +327,11 @@ class Database:
                                             else:
                                                 print(f"Unknown measurementName name fom device: {deviceName} form sensor: {sensorName} received: {measurementName}")
                                             
+                                        elif sensorName == "battery_voltage":
+                                            if measurementName == "bat_voltage":
+                                                device1battery = float(measurementData)
+                                            else:
+                                                print(f"Unknown measurementName name fom device: {deviceName} form sensor: {sensorName} received: {measurementName}")
                                         else:
                                             print(f"Unknown sensorName name fom device: {deviceName} received: {sensorName}")
 
@@ -344,7 +355,13 @@ class Database:
 
                                             else:
                                                 print(f"Unknown measurementName name fom device: {deviceName} form sensor: {sensorName} received: {measurementName}")
-                                            
+
+                                        elif sensorName == "battery_voltage":
+                                            if measurementName == "bat_voltage":
+                                                device2battery = float(measurementData)
+                                            else:
+                                                print(f"Unknown measurementName name fom device: {deviceName} form sensor: {sensorName} received: {measurementName}")    
+                                        
                                         else:
                                             print(f"Unknown sensorName name fom device: {deviceName} received: {sensorName}")
 
@@ -388,6 +405,12 @@ class Database:
                                             else:
                                                 print(f"Unknown measurementName name fom device: {deviceName} form sensor: {sensorName} received: {measurementName}")
                                             
+                                        elif sensorName == "battery_voltage":
+                                            if measurementName == "bat_voltage":
+                                                device3battery = float(measurementData)
+                                            else:
+                                                print(f"Unknown measurementName name fom device: {deviceName} form sensor: {sensorName} received: {measurementName}")
+
                                         else:
                                             print(f"Unknown sensorName name fom device: {deviceName} received: {sensorName}")
 
@@ -396,9 +419,9 @@ class Database:
 
             return self.__post(
                                 inserttime, 
-                                device1humidity, device1co2, device1temp, device1light, 
-                                device2humidity, device2co2, device2temp, device2light, 
-                                device3humidity, device3co2, device3temp, device3light,
+                                device1humidity, device1co2, device1temp, device1light, device1battery,
+                                device2humidity, device2co2, device2temp, device2light, device2battery,
+                                device3humidity, device3co2, device3temp, device3light, device3battery,
                                 device3window1a, device3window2b, device3window3a, device3window4b, device3window5a
                             )
 
