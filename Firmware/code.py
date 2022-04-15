@@ -29,12 +29,14 @@ class blueTooth:
         """
         This method advertizes and waits until a device connected to feather
         """
-        
+
         #as long as not connected
         while not self.__ble.connected:
-            #try start advertize as long as not advertizing
-            if not self.__ble.advertising:
+            #start advertizing
+            try:
                 self.__ble.start_advertising(self.__advertisement) #start advertising
+            except:
+                pass
 
             sleep(1) #sleep a second 
 
