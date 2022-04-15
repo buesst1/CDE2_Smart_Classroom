@@ -299,10 +299,6 @@ class Database:
                             for measurementName in list(sensorData.keys()):
                                 measurementData = sensorData[measurementName]
 
-                                #skip battery voltage
-                                if measurementName == "bat_voltage":
-                                    continue
-
                                 if measurementData != Error.ReadFailure:
 
                                     #assign data to variable
