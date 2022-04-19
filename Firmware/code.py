@@ -1,3 +1,4 @@
+import storage
 import math
 from time import monotonic, sleep
 from adafruit_ble import BLERadio
@@ -14,9 +15,22 @@ import busio
 import json
 import alarm
 
+storage.remount("/", readonly=False) #remount filesystem
+
+def Write_To_Log_File(clssName:str, text:str):
+    """
+    Write text to log file 
+    format: 'monotonic time': 'clssName': 'text'
+    """
+    
+    timestamp = monotonic()
+    with open("/log.txt", "a+") as fd:
+        fd.write(str(timestamp) + ": " + clssName, ": " + text + "\n")
+        fd.flush()
 
 class blueTooth:
     def __init__(self, deviceName: str, start_read_timeout_s=10):
+        Write_To_Log_File("blueTooth", "")
         self.__ble = BLERadio()
         self.__ble.name = deviceName
 
@@ -24,6 +38,7 @@ class blueTooth:
         self.__uart.timeout = start_read_timeout_s
 
         self.__advertisement = ProvideServicesAdvertisement(self.__uart)
+        Write_To_Log_File("blueTooth", "init ble finished")
 
     def Advertise_Until_Connected_Sync(self):
         """
@@ -31,6 +46,7 @@ class blueTooth:
         """
 
         #as long as not connected
+        Write_To_Log_File("blueTooth", "advertizing started")
         while not self.__ble.connected:
             #start advertizing
             try:
@@ -41,6 +57,7 @@ class blueTooth:
             sleep(1) #sleep a second 
 
         self.__ble.stop_advertising() #stop advertising
+        Write_To_Log_File("blueTooth", "advertizing stopped")
 
     def Is_Connected(self):
         return self.__ble.connected
@@ -54,6 +71,8 @@ class blueTooth:
         end_char (char) -> end character
         max_num_of_received_chars (int) -> max number of characters to be reiceved to avoid an overflow of ram
         """
+
+        Write_To_Log_File("blueTooth", "message reading started")
 
         if not self.__ble.connected:
             raise Exception("not connected to a device")
@@ -77,18 +96,26 @@ class blueTooth:
         message = message.rstrip("\n")
         message = message.rstrip("\r")
 
+        Write_To_Log_File("blueTooth", "message successfully read")
+
         return message 
             
     def Write_Message_Sync(self, message: str):
+        Write_To_Log_File("blueTooth", "start writing message")
+
         msg = message + "\n"
         for msg_snippets in msg:
             buffer = str.encode(msg_snippets, "utf-8")
 
             self.__uart.write(buffer)
             sleep(0.0001)
+
+        Write_To_Log_File("blueTooth", "successfully written message")
             
 class SCD30_Sensor:
     def __init__(self, i2c_address = 0x61):
+        Write_To_Log_File("SCD30_Sensor", "init started")
+
         self.__i2c = busio.I2C(board.SCL, board.SDA, frequency=1000)  # for FT232H, use 1KHz
         self.__scd = adafruit_scd30.SCD30(self.__i2c, address=i2c_address)
         self.__scd.measurement_interval = 25 #set measurement intervall to 25s
@@ -97,33 +124,50 @@ class SCD30_Sensor:
         self.__relHum_percent = None
         self.__co2_ppm = None
 
+        Write_To_Log_File("SCD30_Sensor", "init finished")
+
     def __readSensors(self):
+        Write_To_Log_File("SCD30_Sensor", "reading measurements started")
+
         if self.__scd.data_available:
             self.__temp_celcius = float(self.__scd.temperature)
             self.__relHum_percent = float(self.__scd.relative_humidity)
             self.__co2_ppm = float(self.__scd.CO2)
 
+        Write_To_Log_File("SCD30_Sensor", "reading measurements successfully finished")
+
     def Read_CO2_PPM(self) -> float:
+        Write_To_Log_File("SCD30_Sensor", "read_co2 sensor started")
         self.__readSensors()
 
         if self.__co2_ppm == None:
             raise Exception("SCD30_Sensor: CO2: No data available")
 
+        Write_To_Log_File("SCD30_Sensor", "read_co2 sensor successfully finished")
+
         return self.__co2_ppm
 
     def Read_Rel_Hum_Percent(self) -> float:
+        Write_To_Log_File("SCD30_Sensor", "read_humidity started")
+
         self.__readSensors()
 
         if self.__relHum_percent == None:
             raise Exception("SCD30_Sensor: Humidity: No data available")
 
+        Write_To_Log_File("SCD30_Sensor", "read_humidity successfully finished")
+
         return self.__relHum_percent
     
     def Read_Temp_Celcius(self) -> float:
+        Write_To_Log_File("SCD30_Sensor", "read_temp started")
+
         self.__readSensors()
 
         if self.__temp_celcius == None:
             raise Exception("SCD30_Sensor: Temperature: No data available")
+
+        Write_To_Log_File("SCD30_Sensor", "read_temp successfully finished")
 
         return self.__temp_celcius
 
@@ -133,22 +177,34 @@ class Light_Sensor:
         m,q calculated with diagram from SEN-09088.pdf
         """
 
+        Write_To_Log_File("Light_Sensor", "init started")
+
         self.__analogRead = AnalogIn(pin)
 
         self.__m = 100 / 0.0002395 #according to datasheet: typ 239.5 uA at 100lux
         self.__q = 0 #according to datasheet: 0lux -> max 10nA
 
+        Write_To_Log_File("Light_Sensor", "init successfully finished")
+
     def __Read_Current_Ampere(self, R1_res_ohms=68000):
+        Write_To_Log_File("Light_Sensor", "readcurrent started")
+
         ref_voltage = self.__analogRead.reference_voltage
         voltage_R1 = (ref_voltage / 65536) * self.__analogRead.value #calculate voltage on pin
 
         current_R1 = voltage_R1 / R1_res_ohms #calculate current through sensor (voltage over R1 / R1 (68kOhm))
 
+        Write_To_Log_File("Light_Sensor", "readcurrent successfully finished")
+
         return current_R1
 
     def Get_Light_Strength_Lux(self):
         try:
+            Write_To_Log_File("Light_Sensor", "get_light_strength started")
+
             current_A = self.__Read_Current_Ampere()
+
+            Write_To_Log_File("Light_Sensor", "get_light_strength successfully finisehd")
         
             return self.__m * current_A + self.__q
 
@@ -157,15 +213,23 @@ class Light_Sensor:
         
 class Battery_Voltage:
     def __init__(self, pin: board = board.BATTERY, voltage_divider_ratio = 0.5):
+        Write_To_Log_File("Battery_Voltage", "init started")
+
         self.__analogRead = AnalogIn(pin)
         self.__divider_ratio = voltage_divider_ratio
         self.__ref_voltage = self.__analogRead.reference_voltage
 
+        Write_To_Log_File("Battery_Voltage", "init stopped")
+
     def Read_Voltage(self):
+        Write_To_Log_File("Battery_Voltage", "try execute a read_voltage")
         return ((self.__ref_voltage / 65536) * self.__analogRead.value) / self.__divider_ratio #calculate voltage on battery
 
 class Magnetic_Sensors:
     def __init__(self, pinS1=board.D5, pinS2=board.D6, pinS3=board.D9, pinS4=board.D10, pinS5=board.D11) -> None:
+
+        Write_To_Log_File("Magnetic_Sensors", "init started")
+
         self.__sensor1 = DigitalInOut(pinS1)
         self.__sensor1.direction = Direction.INPUT
         self.__sensor1.pull = Pull.UP
@@ -186,10 +250,14 @@ class Magnetic_Sensors:
         self.__sensor5.direction = Direction.INPUT
         self.__sensor5.pull = Pull.UP
 
+        Write_To_Log_File("Magnetic_Sensors", "init stopped")
+
     def Read_Sensors(self) -> tuple:
         """
         This methods reads all Sensors and returns a tuple of the sensor states [0] = state of sensor1 -> True (Logical 1 on pin)
         """
+
+        Write_To_Log_File("Magnetic_Sensors", "try execute a read_sensors")
         
         return (self.__sensor1.value, self.__sensor2.value, self.__sensor3.value, self.__sensor4.value, self.__sensor5.value)
 
@@ -210,6 +278,8 @@ class Manager:
         sensors (list of Sensors to activate)
         """
 
+        Write_To_Log_File("Manager", "init started")
+
         self.__sensors = sensors
         self.__sensors.append(Sensors.BatteryVoltage)#append BatteryVoltage as default
 
@@ -224,7 +294,11 @@ class Manager:
 
         self.__Init_Sensors()
 
+        Write_To_Log_File("Manager", "init finished")
+
     def __Init_Sensors(self):
+        Write_To_Log_File("Manager", "init_sensors started")
+
         if Sensors.SCD30_Sensor in self.__sensors:
             try:
                 self.__scd_30_sensor = SCD30_Sensor()
@@ -249,6 +323,8 @@ class Manager:
             except:
                 self.__battery_voltage = Error.PhysicalConnectionerror
 
+        Write_To_Log_File("Manager", "init_sensors successfully finished")
+
     def Wait_For_Connection_sync(self):
         """
         This function waits for a bluetooth connection 
@@ -264,6 +340,8 @@ class Manager:
 
     def Read_Measures(self) -> dict:
         sensors = {}
+
+        Write_To_Log_File("Manager", "read_measures started")
 
         #if sensor active
         if self.__scd_30_sensor != None:
@@ -352,10 +430,14 @@ class Manager:
             else:
                 sensors["battery_voltage"] = Error.PhysicalConnectionerror
 
+        Write_To_Log_File("Manager", "read_measures successfully stopped")
+
         return sensors
 
 
 #read deviceName and sensors to activate
+Write_To_Log_File("Main", "init started")
+
 with open("config", "r") as fd:
     lines = fd.readlines()
 
@@ -379,32 +461,48 @@ for sensor in sensors:
 
 manager = Manager(sensors, deviceName)
 
+Write_To_Log_File("Main", "init successfully finished")
+
 while True:
     try:
         print("Wait for a connection")
+        Write_To_Log_File("Main", "waiting for a connection")
+
         #wait for a ble connection
         manager.Wait_For_Connection_sync() 
-    
+
+        Write_To_Log_File("Main", "connected to master")
         print("Connected")
 
+        Write_To_Log_File("Main", "read_message_from_ble started")
         message = manager.Read_Message_From_BLE()
+        Write_To_Log_File("Main", "read_message_from_ble successfully stopped")
 
         if message == "measure_request":
 
+            Write_To_Log_File("Main", "measure_request command successfully recognized")
+
+            Write_To_Log_File("Main", "try read measures and convert to json started")
             stringified_json = json.dumps(manager.Read_Measures())
+            Write_To_Log_File("Main", "try read measures and convert to json successfully stopped")
 
             print("Message:\n", stringified_json)
 
+            Write_To_Log_File("Main", "start writing message to master")
             manager.Write_Message_To_BLE(stringified_json)
+            Write_To_Log_File("Main", "writing message to master successfully stopped")
 
         else:
             raise Exception("Unknown command received")
         
         #go in light sleep
+        Write_To_Log_File("Main", "start with light sleep")
         time_alarm = alarm.time.TimeAlarm(monotonic_time=monotonic() + 20)
         alarm.light_sleep_until_alarms(time_alarm)
+        Write_To_Log_File("Main", "wakeup from light sleep")
 
     except Exception as ex:
+        Write_To_Log_File("Main", f"exception occured in mainloop: {ex}")
         print(f"Exception occuren in main loop: {ex}") 
 
     

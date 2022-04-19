@@ -11,6 +11,19 @@ import json
 import os
 from iterators import TimeoutIterator
 
+#log file appender
+log_fileName = str(os.path.dirname(os.path.realpath(__file__))) + "/log.txt" #full path to cache script
+def Write_To_Log_File(clssName:str, text:str):
+    """
+    Write text to log file 
+    format: 'monotonic time': 'clssName': 'text'
+    """
+    
+    timestamp = monotonic()
+    with open(log_fileName, "a+") as fd:
+        fd.write(str(timestamp) + ": " + clssName, ": " + text + "\n")
+        fd.flush()
+
 class SSL:
     def __init__(self, host= 'solarbroom.com', port= 443) -> None:
         self.HOST = host
@@ -24,6 +37,8 @@ class SSL:
         this method can raise an error
         """
 
+        Write_To_Log_File("SSL", "start reading from connection")
+
         message = "" #message stored here
         while True:
             data = conn.recv(buflen=1024) #read 1024 bytes
@@ -36,6 +51,8 @@ class SSL:
             for chr in bytes.decode(data):
                 #if endchar received -> return message
                 if chr == "\n":
+                    Write_To_Log_File("SSL", "sucessfully read from connection")
+
                     return message
 
                 else: #otherwise add char to message
@@ -48,8 +65,12 @@ class SSL:
 
         #try creating socket
         try:
+            Write_To_Log_File("SSL", "start creating binding socket")
+
             bindsocket = socket.create_connection((self.HOST, self.PORT), timeout=5)
             bindsocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+            Write_To_Log_File("SSL", "successfully created binding socket")
 
             print("BindingSocket successfully created")
 
@@ -59,17 +80,23 @@ class SSL:
                 bindsocket.close()
             except:
                 pass
+            
+            Write_To_Log_File("SSL", f"exception occured in create binding socket: {ex}")
 
             print(f"Exception occured during creating bindingSocket: {ex}")
             return None
 
         #try create sslcontext
         try:
+            Write_To_Log_File("SSL", "start wrapping socket")
+
             context = ssl._create_unverified_context()            
             conn = context.wrap_socket(bindsocket, server_hostname=self.HOST)
             bindsocket.close() #close original socket
 
             conn.settimeout(5) #set read/write timeout to 5 seconds
+
+            Write_To_Log_File("SSL", "socket successfully wrapped")
 
             print("SSLSocket successfully created")
 
@@ -86,6 +113,8 @@ class SSL:
             except:
                 pass
 
+            Write_To_Log_File("SSL", f"wrapping socket failed: {ex}")
+
             print(f"Building ssl connection failed: {ex}")    
             return None
 
@@ -101,21 +130,31 @@ class SSL:
 
             print(f"Sending message: {message_bytes}")
 
+            Write_To_Log_File("SSL", "start sending text to server")
             conn.sendall(message_bytes)
+            Write_To_Log_File("SSL", "text successfully sent to server")
 
             print("Message Sent")
 
             try:
+                Write_To_Log_File("SSL", "start reading from server")
                 answer = self.__read_from_conn(conn)
+                Write_To_Log_File("SSL", "successfully read data from server")
 
                 print(f"Answer received: {answer}")
 
             except Exception as ex:
                 returnNone = True #set flag
+
+                Write_To_Log_File("SSL", f"exception occured in read_from_conn: {ex}")
+
                 print(f"Exception occured during receiving answer from server: {ex}")
 
         except Exception as ex:
             returnNone = True #set flag
+
+            Write_To_Log_File("SSL", f"exception occured in send data to server: {ex}")
+
             print(f"Exception occured during sending data to server: {ex}")
 
         finally:
@@ -169,10 +208,14 @@ class SSL:
             
 class Cache:
     def __init__(self, relative_fileName = "cache") -> None:
+        Write_To_Log_File("Cache", "init started")
+
         self.__script_dir = os.path.dirname(os.path.realpath(__file__)) #<-- absolute dir the script is in
         self.__full_fileName = str(self.__script_dir) + "/" + relative_fileName #full path to cache script
 
         self.__cache_cleanup_or_creation()#delete invalid data or create file if not existing
+
+        Write_To_Log_File("Cache", "init stopped")
 
     def __cache_cleanup_or_creation(self):
         try:
@@ -207,18 +250,25 @@ class Cache:
 
     def Cache_Append_Json(self, json_file:json) -> bool:
         try:
+            Write_To_Log_File("Cache", "appending json started")
             #append jsons to cache
             with open(self.__full_fileName, 'a') as fd:
                 fd.write(json.dumps(json_file) + "\n")
 
+            Write_To_Log_File("Cache", "appending json successfully finished")
+
             return True
 
         except Exception as ex:
+            Write_To_Log_File("Cache", f"exception occured in changing json: {ex}")
+
             print(f"Cache append encountered an error: {ex}")
             return False
 
     def Cache_Read(self) -> list or None:
         try:
+            Write_To_Log_File("Cache", "read cache started")
+
             #read content of caches
             with open(self.__full_fileName, "r") as fd:
                 content:str = fd.read()
@@ -232,21 +282,31 @@ class Cache:
                     except:
                         print("Measurement lost during cache reading...")
 
+            Write_To_Log_File("Cache", "read cache successfully stopped")
+
             return json_files   
 
         except Exception as ex:
+            Write_To_Log_File("Cache", f"exception occured in read_cache: {ex}")
+
             print(f"Cache read encountered an error: {ex}")
             return None
 
     def Cache_Clear(self) -> bool:
         try:
+            Write_To_Log_File("Cache", "start cache clear")
+
             #clear cache
             with open(self.__full_fileName, 'w') as fd:
                 pass
 
+            Write_To_Log_File("Cache", "cache clear successfully finished")
+
             return True
 
         except Exception as ex:
+            Write_To_Log_File("Cache", f"exception occured in cache clear: {ex}")
+
             print(f"Cache clear encountered an error: {ex}")
             return False
 
@@ -256,6 +316,8 @@ class BLE:
         params:
         device_names (list of strings): device_names of measurement devices
         """
+
+        Write_To_Log_File("BLE", "init started")
 
         self.__device_names = device_names
         
@@ -267,6 +329,8 @@ class BLE:
 
         # PyLint can't find BLERadio for some reason so special case it here.
         self.__ble = adafruit_ble.BLERadio()  # pylint: disable=no-member
+
+        Write_To_Log_File("BLE", "init stopped")
 
     def __Scan_For_Advertizements(self, timeout_s=10) -> dict:
         """
@@ -280,12 +344,16 @@ class BLE:
 
         try:
             print("scanning")
+            Write_To_Log_File("BLE", "start advertizement scan")
+
             found_addr = set()
             it = TimeoutIterator(self.__ble.start_scan(ProvideServicesAdvertisement, timeout=timeout_s), timeout_s + 5) #TimeoutIterator used because of: self.__ble.start_scan does not yield anything if nothign is found 
             for advertisement in it: 
                 
                 #timeout received
                 if advertisement == it.get_sentinel():
+                    Write_To_Log_File("BLE", "timeout occured during scanning advertizements")
+
                     print("Iterator timed out... interrupt")
                     break
 
@@ -303,15 +371,21 @@ class BLE:
 
                     if name in self.__device_names:
                         measurement_device_advertizements[name] = advertisement
+
                         print(f"Device with name: {name} and address: {addr} found")
+                        Write_To_Log_File("BLE", f"Device with name: {name} and address: {addr} found")
 
         except Exception as ex:
             print(f"Exception occured in __Scan_For_Advertizements: {ex} ->  restarting bluetooth")
+            Write_To_Log_File("BLE", f"Exception occured in __Scan_For_Advertizements: {ex} ->  restarting bluetooth")
+
             os.system("sudo /etc/init.d/bluetooth  restart")
 
         self.__Stop_Scan_Save()
 
         print("scan done")
+
+        Write_To_Log_File("BLE", "scan successfully stopped")
 
         return measurement_device_advertizements
 
@@ -330,12 +404,17 @@ class BLE:
         """
 
         try:
+            Write_To_Log_File("BLE", "connect to device started")
+
             if UARTService not in device_advertisements.services:
                 raise Exception("UART not available for this device")
+
+            Write_To_Log_File("BLE", "successfully tried to device (does not mean that we have successfully connected)")
 
             return self.__ble.connect(device_advertisements, timeout=timeout)
 
         except Exception as ex:
+            Write_To_Log_File("BLE", f"exception occured in try_connect_to_device: {ex}")
             print(f"Was unable to connect to device:\n{ex}")
             return None
 
@@ -357,6 +436,8 @@ class BLE:
         json_response: json = None
 
         try:
+            Write_To_Log_File("BLE", "request measurement from connection started")
+
             if UARTService not in connection:
                 raise Exception("UART not available for this device")
 
@@ -390,8 +471,12 @@ class BLE:
                     else:
                         json_response = json.loads(message)
                         break
+
+            Write_To_Log_File("BLE", "successfully requested measurements from connection")
             
         except Exception as ex:
+            Write_To_Log_File("BLE", f"exception occured in request_measurements_from_connection: {ex}")
+
             print(f"Exception occured in __Request_Measurements_from_connection: {ex}")
 
         return json_response
@@ -399,7 +484,9 @@ class BLE:
     def Start_Request(self, max_number_of_tries:int = 5):
         jsons:json = json.loads(json.dumps({deviceName:"BLE_error" for deviceName in self.__device_names})) #create json 
 
+        Write_To_Log_File("BLE", "start advertizement scan")
         adverts = self.__Scan_For_Advertizements()
+        Write_To_Log_File("BLE", "successfully finished advertizement scan")
 
         timeStamp = datetime.now() #get current time
         for deviceName in list(adverts.keys()):
@@ -409,17 +496,22 @@ class BLE:
             while number_of_tries < max_number_of_tries:
                 print(f"Try connect to  {deviceName}")
 
+                Write_To_Log_File("BLE", f"try connect to: {deviceName}")
+
                 connection = self.__TryConnect_ToDevice(ad)
 
                 if (connection != None):
                     print(f"Successfully connected to {deviceName} -> start reading")
+                    Write_To_Log_File("BLE", f"Successfully connected to {deviceName} -> start reading")
 
                     answer = self.__Request_Measurements_from_connection(connection)
 
+                    Write_To_Log_File("BLE", f"Finished reading from {deviceName} -> disconnect")
                     print(f"Finished reading from {deviceName} -> disconnect")
 
                     self.__Disconnect_FromDevice_Save(connection) #disconnect if a connection was opened
 
+                    Write_To_Log_File("BLE", f"Disconnected from {deviceName}")
                     print(f"Disconnected from {deviceName}")
 
                     #getting data was successful
@@ -427,13 +519,16 @@ class BLE:
                         jsons[deviceName] = answer
 
                         print(f"Successfully got data from {deviceName}")
+                        Write_To_Log_File("BLE", f"Successfully got data from {deviceName}")
 
                     else:
+                        Write_To_Log_File("BLE", "Successfully connected to {deviceName} but was unable to get data")
                         print(f"Successfully connected to {deviceName} but was unable to get data")
                         
                     break #end 
 
                 else:
+                    Write_To_Log_File("BLE", f"Was unable to connect to {deviceName}")
                     print(f"Was unable to connect to {deviceName}")
 
                 number_of_tries += 1 #increment counter
@@ -446,19 +541,24 @@ cache = Cache()
 
 while True:
     try:
+        Write_To_Log_File("Main", "sleep for 30 seconds start")
         #wait 30s
         timestamp = monotonic()
         while (monotonic() - timestamp) < 30:
             sleep(1)
+        Write_To_Log_File("Main", "sleep for 30 seconds finished")
 
         #start measurement
         all_jsons = [] #all measurements are stored here
 
         #start a ble request
+        Write_To_Log_File("Main", "request for data started")
         start_Time, jsons = ble.Start_Request()
         new_measurement = json.dumps({"timeStamp":start_Time.strftime("%d/%m/%Y %H:%M:%S"), "data":jsons})  
+        Write_To_Log_File("Main", "successfully read data from ble and dumped to json")
 
         #read cached jsons
+        Write_To_Log_File("Main", "start cache things")
         cached_jsons = cache.Cache_Read() 
 
         #append jsons
@@ -467,15 +567,23 @@ while True:
         if cached_jsons != None:
             all_jsons.extend(cached_jsons)
         
+        Write_To_Log_File("Main", "successfully stopped cache things")
+        
+        Write_To_Log_File("Main", "start send data to server")
         #if jsons sent successfully
         if server.Send_Jsons(all_jsons):
+            Write_To_Log_File("Main", "successfully sent data to server -> delete cache")
+
             if not cache.Cache_Clear():#clear cache
                 raise Exception("cache could not be cleared")
 
         else:
+            Write_To_Log_File("Main", "send data to server failed -> cache data")
             print("Data Cached")
+
             if not cache.Cache_Append_Json(new_measurement):
                 raise Exception("cache could not be extended")
 
     except Exception as ex:
+        Write_To_Log_File("Main", f"exception occured in main loop: {ex}")
         print(f"Exception occured in MainLoop: {ex}")

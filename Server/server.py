@@ -46,7 +46,7 @@ class SSL:
                         print("listening")
                         newsocket, fromaddr = bindsocket.accept() #wait for incoming connection
                         print("accepted")
-                        connstream = context.wrap_socket(newsocket, server_side=True)
+                        connstream = context.wrap_socket(newsocket, server_side=True) # <- stuck here
                         print("socket wrapped")
                         connstream.settimeout(5) #set read/write timeout to 5 seconds
                         print("timeout set")
