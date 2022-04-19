@@ -21,7 +21,7 @@ def Write_To_Log_File(clssName:str, text:str):
     
     timestamp = monotonic()
     with open(log_fileName, "a+") as fd:
-        fd.write(str(timestamp) + ": " + clssName, ": " + text + "\n")
+        fd.write(str(timestamp) + ": " + clssName + ": " + text + "\n")
         fd.flush()
 
 class SSL:

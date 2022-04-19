@@ -1,4 +1,3 @@
-import storage
 import math
 from time import monotonic, sleep
 from adafruit_ble import BLERadio
@@ -15,8 +14,6 @@ import busio
 import json
 import alarm
 
-storage.remount("/", readonly=False) #remount filesystem
-
 def Write_To_Log_File(clssName:str, text:str):
     """
     Write text to log file 
@@ -25,7 +22,7 @@ def Write_To_Log_File(clssName:str, text:str):
     
     timestamp = monotonic()
     with open("/log.txt", "a+") as fd:
-        fd.write(str(timestamp) + ": " + clssName, ": " + text + "\n")
+        fd.write(str(timestamp) + ": " + clssName + ": " + text + "\n")
         fd.flush()
 
 class blueTooth:
