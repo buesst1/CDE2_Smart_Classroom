@@ -27,7 +27,7 @@ def Write_To_Log_File(clssName:str, text:str):
 
 class blueTooth:
     def __init__(self, deviceName: str, start_read_timeout_s=10):
-        Write_To_Log_File("blueTooth", "")
+        Write_To_Log_File("blueTooth", "init started")
         self.__ble = BLERadio()
         self.__ble.name = deviceName
 
