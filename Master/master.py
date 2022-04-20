@@ -332,12 +332,12 @@ class BLE:
 
         Write_To_Log_File("BLE", "init stopped")
 
-    def __Scan_For_Advertizements(self, timeout_s=10) -> dict:
+    def __Scan_For_Advertizements(self, timeout_s=10.0) -> dict:
         """
         Scan for advertizements 
 
         params:
-        timeout: timeout of scanning (iteratorTimeout = timeout_s + 2; scanTimeout = timeout_s)
+        timeout: timeout of scanning (iteratorTimeout = timeout_s + 5; scanTimeout = timeout_s)
         """
         
         measurement_device_advertizements = {} #advertizements of measurement devices are stored here
@@ -395,7 +395,7 @@ class BLE:
         except:
             pass
 
-    def __TryConnect_ToDevice(self, device_advertisements: ProvideServicesAdvertisement, timeout=10) -> list:
+    def __TryConnect_ToDevice(self, device_advertisements: ProvideServicesAdvertisement, timeout=10.0) -> list:
         """
         This method tries to connect to all advertizements
 
@@ -425,7 +425,7 @@ class BLE:
         except:
             pass
 
-    def __Request_Measurements_from_connection(self, connection: BLEConnection, start_read_timeout_s=4) -> list:
+    def __Request_Measurements_from_connection(self, connection: BLEConnection, start_read_timeout_s=4.0) -> list:
         """
         This method requests all measurements from all devices
 

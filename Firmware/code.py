@@ -26,7 +26,7 @@ def Write_To_Log_File(clssName:str, text:str):
         fd.flush()
 
 class blueTooth:
-    def __init__(self, deviceName: str, start_read_timeout_s=10):
+    def __init__(self, deviceName: str, start_read_timeout_s=10.0):
         Write_To_Log_File("blueTooth", "init started")
         self.__ble = BLERadio()
         self.__ble.name = deviceName
@@ -59,7 +59,7 @@ class blueTooth:
     def Is_Connected(self):
         return self.__ble.connected
 
-    def Read_Message_Sync(self, timeout_s = 4) -> str:
+    def Read_Message_Sync(self, timeout_s = 4.0) -> str:
         """
         This method reads incoming data
 
