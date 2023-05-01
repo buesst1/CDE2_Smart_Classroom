@@ -1,0 +1,48 @@
+Setup:
+-sudo apt-get install wpasupplicant -> wpa supplicant installieren falls nicht vorhanden
+-sudo su -> als superuser einloggen
+-ifdown wlan0 (oder -sudo ip link set wlan0 down)
+-killall wpa_supplicant
+-nano /etc/network/interfaces
+
+-folgendes in "" einfügen: -> wpa einbinden
+"
+# interfaces(5) file used by ifup(8) and ifdown(8)
+# Include files from /etc/network/interfaces.d:
+source /etc/network/interfaces.d/*
+
+allow-hotplug wlan0
+iface wlan0 inet manual
+        wpa-conf /etc/wpa_supplicant/wpa_supplicant.conf
+
+iface wlan0 inet dhcp
+"
+
+-nano /etc/wpa_supplicant/wpa_supplicant.conf
+
+-folgendes in "" einfügen-> zugangsdaten für wlan
+"
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+country=CH
+
+network={
+        ssid="edubs-byod"
+        eap=PEAP
+        key_mgmt=WPA-EAP
+        phase2="auth=MSCHAPV2"
+        identity=""
+        password=""
+}
+"
+
+-wpa_supplicant -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf -> authentication prüfen (authentication successful)
+
+-ifup wlan0 (oder -sudo ip link set wlan0 up)
+
+-iwconfig -> verbindung prüfen
+
+-ping -c 3 www.google.com -> internetzugang prüfen
+
+
+

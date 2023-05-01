@@ -1,0 +1,8 @@
+Device1
+CO2_Sensor,Light_Sensor
+
+## this file stores the name of the Device and all sensors that should be activated
+## only the frist two lines are necessary
+
+##first Line: contains name of device
+##second Line: contains all sensors that should be activated. Sensor names are separated with comma and no whitespace -> possible sensors (battery voltage is always included): CO2_Sensor,Magnetic_Sensors,Light_Sensor 

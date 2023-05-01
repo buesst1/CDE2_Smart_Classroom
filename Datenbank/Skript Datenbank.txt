@@ -1,0 +1,230 @@
+Create table any_sensor_data_entry 
+
+(entryid number, 
+
+inserttime timestamp, 
+
+device1humidity float, 
+
+device1co2 float, 
+
+device1temp float,
+
+device2humidity float, 
+
+device2co2 float, 
+
+device2temp float,
+
+device3humidity float, 
+
+device3co2 float, 
+
+device3temp float,
+
+device3window1a number,
+
+device3window2b number,
+
+device3window3a number,
+
+device3window4b number,
+
+device3window5a number,
+
+device1light float,
+
+device2light float,
+
+device3light float,
+
+device1battery float,
+
+device2battery float,
+
+device3battery float
+; 
+
+
+CREATE SEQUENCE SEQ_ENTRY_ID;
+
+
+ DECLARE 
+
+  PRAGMA AUTONOMOUS_TRANSACTION; 
+
+BEGIN 
+
+ 
+
+    ORDS.ENABLE_OBJECT(p_enabled => TRUE, 
+
+                       p_schema => 'SENSOR_DATALAKE2', 
+
+                       p_object => 'ANY_SENSOR_DATA_ENTRY', 
+
+                       p_object_type => 'TABLE', 
+
+                       p_object_alias => 'any_sensor_data_entry', 
+
+                       p_auto_rest_auth => TRUE); 
+
+ 
+
+    commit; 
+
+ 
+
+END;
+
+
+BEGIN 
+
+  ORDS.DEFINE_MODULE( 
+
+      p_module_name    => 'sens', 
+
+      p_base_path      => 'sens', 
+
+      p_items_per_page =>  25, 
+
+      p_status         => 'PUBLISHED', 
+
+      p_comments       => NULL);       
+
+  ORDS.DEFINE_TEMPLATE( 
+
+      p_module_name    => 'sens', 
+
+      p_pattern        => 'any_sensor_data_entry', 
+
+      p_priority       => 2, 
+
+      p_etag_type      => 'HASH', 
+
+      p_etag_query     => NULL, 
+
+      p_comments       => NULL); 
+
+ 
+
+  COMMIT;  
+
+END; 
+
+
+GET mit SELECT * FROM any_sensor_data_entry;
+
+
+CREATE OR REPLACE PROCEDURE create_one_sensor_data ( 
+
+  p_inserttime    IN  any_sensor_data_entry.inserttime%TYPE, 
+
+  p_device1humidity    IN  any_sensor_data_entry.device1humidity%TYPE, 
+
+  p_device1co2   IN  any_sensor_data_entry.device1co2%TYPE, 
+
+  p_device1temp       IN  any_sensor_data_entry.device1temp%TYPE,
+
+  p_device2humidity    IN  any_sensor_data_entry.device2humidity%TYPE, 
+
+  p_device2co2   IN  any_sensor_data_entry.device2co2%TYPE, 
+
+  p_device2temp       IN  any_sensor_data_entry.device2temp%TYPE,
+
+  p_device3humidity    IN  any_sensor_data_entry.device3humidity%TYPE, 
+
+  p_device3co2   IN  any_sensor_data_entry.device3co2%TYPE, 
+
+  p_device3temp       IN  any_sensor_data_entry.device3temp%TYPE,
+
+  p_device3window1a       IN  any_sensor_data_entry.device3window1a%TYPE,
+
+  p_device3window2b       IN  any_sensor_data_entry.device3window2b%TYPE, 
+
+  p_device3window3a       IN  any_sensor_data_entry.device3window3a%TYPE, 
+
+  p_device3window4b       IN  any_sensor_data_entry.device3window4b%TYPE, 
+
+  p_device3window15a       IN  any_sensor_data_entry.device3window5a%TYPE,  
+
+  p_device1light      IN  any_sensor_data_entry.device1light%TYPE,
+
+  p_device2light      IN  any_sensor_data_entry.device2light%TYPE,
+
+  p_device3light      IN  any_sensor_data_entry.device3light%TYPE,
+
+  p_device1battery      IN  any_sensor_data_entry.device1battery%TYPE,
+
+  p_device2battery      IN  any_sensor_data_entry.device2battery%TYPE,
+
+  p_device3battery      IN  any_sensor_data_entry.device3battery%TYPE,
+
+) 
+
+AS 
+
+BEGIN 
+
+  INSERT INTO any_sensor_data_entry (entryid, inserttime, device1humidity, device1co2, device1temp,device2humidity, device2co2, device2temp,device3humidity, device3co2, device3temp,device3window1a,device3window2b,device3window3a,device3window4b,device3window5a,device1light,device2light,device3light,device1battery,device2battery,device3battery) 
+
+  VALUES (seq_entry_id.nextval, p_inserttime, p_device1humidity, p_device1co2, p_device1temp, p_device2humidity, p_device2co2, p_device2temp p_device3humidity, p_device3co2, p_device3temp,p_device3window1a,p_device3window2b,p_device3window3a,p_device3window4b,p_device3window5a,p_device1light,p_device2light,p_device3light,p_device1battery,p_device2battery,p_device3battery); 
+
+EXCEPTION 
+
+  WHEN OTHERS THEN 
+
+    HTP.print(SQLERRM); 
+
+END; 
+
+BEGIN 
+
+                          create_one_sensor_data( 
+
+  p_inserttime  => :inserttime,
+
+  p_device1humidity => :device1humidity,
+
+  p_device1co2 => :device1co2 ,
+
+  p_device1temp => :device1temp, 
+
+  p_device2humidity => :device2humidity,
+
+  p_device2co2 => :device2co2 ,
+
+  p_device2temp => :device2temp ,
+
+  p_device3humidity => :device3humidity,
+
+  p_device3co2 => :device3co2 ,
+
+  p_device3temp => :device3temp ,
+
+  p_device3window1a => :device3window1a ,
+
+  p_device3window2b => :device3window2b ,
+
+  p_device3window3a => :device3window3a ,
+
+  p_device3window4b => :device3window4b ,
+
+  p_device3window5a => :device3window5a ,
+
+  p_device1light => :device1light,
+
+  p_device2light => :device2light,
+
+  p_device3light=> :device3light,
+
+  p_device1battery => :device1battery,
+
+  p_device2battery => :device2battery,
+
+  p_device3battery => :device3battery
+
+
+); 
+
+                         END; 
